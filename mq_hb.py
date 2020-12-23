@@ -31,11 +31,13 @@ class mqHyperband(mqBaseFacade):
                  random_state=1,
                  method_id='Default',
                  restart_needed=True,
+                 time_limit_per_trial=600,
                  ip='',
                  port=13579,):
+        max_queue_len = 3 * R   # conservative design
         super(mqHyperband, self).__init__(objective_func, method_name=method_id,
-                                          restart_needed=restart_needed,
-                                          max_queue_len=3*R, ip=ip, port=port)  # todo max_queue_len confirm
+                                          restart_needed=restart_needed, time_limit_per_trial=time_limit_per_trial,
+                                          max_queue_len=max_queue_len, ip=ip, port=port)
         self.seed = random_state
         self.configuration_space = config_space
         self.configuration_space.seed(self.seed)
@@ -110,6 +112,7 @@ class mqHyperband(mqBaseFacade):
                 self.iterate(skip_last=skip_last)
                 time_elapsed = (time.time() - start_time)/60
                 self.logger.info("Iteration took %.2f min." % time_elapsed)
+                self.save_intemediate_statistics()
             for i, obj in enumerate(self.incumbent_perfs):
                 self.logger.info('%d-th config: %s, obj: %f.' % (i+1, str(self.incumbent_configs[i]), self.incumbent_perfs[i]))
         except Exception as e:

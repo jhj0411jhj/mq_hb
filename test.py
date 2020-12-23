@@ -12,8 +12,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--role', type=str, choices=['master', 'worker'])
 parser.add_argument('--ip', type=str)
 parser.add_argument('--port', type=int, default=13579)
-parser.add_argument('--R', type=int, default=27)
+parser.add_argument('--R', type=int, default=81)
 parser.add_argument('--eta', type=int, default=3)
+parser.add_argument('--n_workers', type=int)
 
 args = parser.parse_args()
 role = args.role
@@ -21,6 +22,11 @@ ip = args.ip
 port = args.port
 R = args.R
 eta = args.eta
+n_workers = args.n_workers  # Caution: must set for saving result to different dirs
+print(role, ip, port, n_workers)
+print(R, eta)
+for para in (role, ip, port, R, eta, n_workers):
+    assert para is not None
 
 
 def get_cs():
@@ -32,7 +38,7 @@ def get_cs():
     return cs
 
 
-def mf_objective_func(config: dict, n_iter):
+def mf_objective_func(config: dict, n_resource):
     uid = config.pop('uid', 1)
     reference = config.pop('reference', None)
     need_lc = config.pop('need_lc', None)
@@ -40,10 +46,10 @@ def mf_objective_func(config: dict, n_iter):
     print('objective extra info in config:', uid, reference, need_lc, method_name)
 
     # todo sample data
-    def sample_data(n_iter, total_iter):
-        print('sample data:', n_iter, total_iter)
+    def sample_data(n_resource, total_resource=R):
+        print('sample data:', n_resource, total_resource)
         return None
-    data = sample_data(n_iter, R)
+    data = sample_data(n_resource)
 
     # x, y = load_data()
     # model = LightGBM(**params)
@@ -56,13 +62,25 @@ def mf_objective_func(config: dict, n_iter):
     num_leaves = config['num_leaves']
     learning_rate = config['learning_rate']
     perf = n_estimators + num_leaves + learning_rate + np.random.rand()/10000
-    return perf
+
+    result = dict(
+        objective_value=perf,
+        early_stop=False,   # for deep learning
+        ref_id=None,
+    )
+    return result
 
 
 cs = get_cs()
 
 if role == 'master':
-    hyperband = mqHyperband(None, cs, R, eta=eta, ip=ip, port=port)
+    random_state = 123
+    dataset = 'nodata'
+    method_id = 'hyperband-%s-n%d-%d' % (dataset, n_workers, random_state)
+    hyperband = mqHyperband(None, cs, R, eta=eta, method_id=method_id, ip=ip, port=port,
+                            restart_needed=True, time_limit_per_trial=600)
+    hyperband.num_iter = 1              # set repeat num of hyperband
+    hyperband.runtime_limit = None      # set total runtime limit
     hyperband.run()
 else:
     worker = mqmfWorker(mf_objective_func, ip, port)

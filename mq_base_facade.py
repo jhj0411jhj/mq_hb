@@ -1,7 +1,17 @@
 import time
 import os
+import numpy as np
+import pickle as pkl
 from litebo.utils.logging_utils import get_logger, setup_logger
 from litebo.core.message_queue.master_messager import MasterMessager
+
+PLOT = False
+try:
+    import matplotlib.pyplot as plt
+    plt.switch_backend('agg')
+    PLOT = True
+except Exception as e:
+    pass
 
 
 class mqBaseFacade(object):
@@ -10,12 +20,17 @@ class mqBaseFacade(object):
                  need_lc=False,
                  method_name=None,
                  log_directory='logs',
-                 max_queue_len=100,
+                 data_directory='data',
+                 time_limit_per_trial=600,
+                 max_queue_len=300,
                  ip='',
                  port=13579,):
         self.log_directory = log_directory
         if not os.path.exists(self.log_directory):
             os.makedirs(self.log_directory)
+        self.data_directory = data_directory
+        if not os.path.exists(self.data_directory):
+            os.makedirs(self.data_directory)
 
         self.logger = self._get_logger("%s-%s" % (__class__.__name__, method_name))
 
@@ -40,9 +55,9 @@ class mqBaseFacade(object):
         if self.method_name is None:
             raise ValueError('Method name must be specified! NOT NONE.')
 
-        self.time_limit_per_trial = 60     # todo caution
+        self.time_limit_per_trial = time_limit_per_trial
 
-        max_queue_len = max(100, max_queue_len)
+        max_queue_len = max(300, max_queue_len)
         self.master_messager = MasterMessager(ip, port, max_queue_len, max_queue_len)
 
     def set_restart(self):
@@ -98,7 +113,7 @@ class mqBaseFacade(object):
         result_num = 0
         result_needed = len(conf_list)
         while True:
-            observation = self.master_messager.receive_message()
+            observation = self.master_messager.receive_message()    # return_info, time_taken, trail_id, config
             if observation is None:
                 # Wait for workers.
                 # self.logger.info("Master: wait for worker results. sleep 1s.")
@@ -106,33 +121,62 @@ class mqBaseFacade(object):
                 continue
             # Report result.
             result_num += 1
-            self.trial_statistics.append(observation)   # return_info, time_taken, trail_id, config
+            global_time = time.time() - self.global_start_time
+            self.trial_statistics.append((observation, global_time))
             self.logger.info('Master: Get the [%d] result, observation is %s.' % (result_num, str(observation)))
             if result_num == result_needed:
                 break
 
         # get the evaluation statistics
-        for trial in self.trial_statistics:
-            return_info, time_taken, trail_id, config = trial
+        for observation, global_time in self.trial_statistics:
+            return_info, time_taken, trail_id, config = observation
 
             performance = return_info['loss']
             if performance < self.global_incumbent:
                 self.global_incumbent = performance
                 self.global_incumbent_configuration = config
 
-            self.add_history(time.time() - self.global_start_time, self.global_incumbent, trail_id,
+            self.add_history(global_time, self.global_incumbent, trail_id,
                              self.global_incumbent_configuration)
             # TODO: old version => performance_result.append(performance)
             performance_result.append(return_info)
             early_stops.append(return_info.get('early_stop', False))
             self.recorder.append({'trial_id': trail_id, 'time_consumed': time_taken,
-                                  'configuration': config, 'n_iteration': n_iteration})
+                                  'configuration': config, 'n_iteration': n_iteration,
+                                  'return_info': return_info, 'global_time': global_time})
 
         self.trial_statistics.clear()
 
+        self.save_intemediate_statistics()
         if self.runtime_limit is not None and time.time() - self.global_start_time > self.runtime_limit:
             raise ValueError('Runtime budget meets!')
         return performance_result, early_stops
+
+    def save_intemediate_statistics(self, save_stage=False):
+        file_name = '%s.npy' % self.method_name
+        x = np.array(self._history['time_elapsed'])
+        y = np.array(self._history['performance'])
+        np.save(os.path.join(self.data_directory, file_name), np.array([x, y]))
+
+        config_file_name = 'config_%s.pkl' % self.method_name
+        with open(os.path.join(self.data_directory, config_file_name), 'wb') as f:
+            pkl.dump(self.global_incumbent_configuration, f)
+
+        record_file_name = 'record_%s.pkl' % self.method_name
+        with open(os.path.join(self.data_directory, record_file_name), 'wb') as f:
+            pkl.dump(self.recorder, f)
+
+        if save_stage:
+            stage_file_name = 'stage_%s.npy' % self.method_name
+            stage_x = np.array(self.stage_history['stage_id'])
+            stage_y = np.array(self.stage_history['performance'])
+            np.save(os.path.join(self.data_directory, stage_file_name), np.array([stage_x, stage_y]))
+
+        if PLOT:
+            plt.plot(x, y)
+            plt.xlabel('Time elapsed (sec)')
+            plt.ylabel('Validation error')
+            plt.savefig("data/%s.png" % self.method_name)
 
     def _get_logger(self, name):
         logger_name = 'mfes_%s' % name

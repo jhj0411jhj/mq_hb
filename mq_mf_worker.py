@@ -32,6 +32,8 @@ class mqmfWorker(object):
             # Start working
             start_time = time.time()
             trial_state = SUCCESS
+            ref_id = None
+            early_stop = False
             try:
                 args, kwargs = (config, n_iteration), dict()
                 timeout_status, _result = time_limit(self.objective_function,
@@ -41,7 +43,14 @@ class mqmfWorker(object):
                     raise TimeoutException(
                         'Timeout: time limit for this evaluation is %.1fs' % time_limit_per_trial)
                 else:
-                    perf = _result if _result is not None else MAXINT
+                    if _result is None:
+                        perf = MAXINT
+                    elif isinstance(_result, dict):
+                        perf = _result['objective_value']
+                        ref_id = _result.get('ref_id', None)
+                        early_stop = _result.get('early_stop', False)
+                    else:
+                        perf = _result
             except Exception as e:
                 if isinstance(e, TimeoutException):
                     trial_state = TIMEOUT
@@ -52,13 +61,13 @@ class mqmfWorker(object):
 
             time_taken = time.time() - start_time
             return_info = dict(loss=perf,
-                               ref_id=579,
-                               early_stop=False,
-                               trail_state=trial_state)   # todo ref_id, early_stop
+                               ref_id=ref_id,
+                               early_stop=early_stop,
+                               trail_state=trial_state)
             observation = [return_info, time_taken, trail_id, config]
 
             # Send result
-            print("Worker: perf=%f. sending result." % perf)
+            print("Worker: perf=%f. time=%d. sending result." % (perf, int(time_taken)))
             try:
                 self.worker_messager.send_message(observation)
             except Exception as e:
