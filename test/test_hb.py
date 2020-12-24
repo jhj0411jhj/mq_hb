@@ -75,12 +75,13 @@ def mf_objective_func(config: dict, n_resource):
 cs = get_cs()
 
 if role == 'master':
-    random_state = 123
+    seed = 123
     dataset = 'nodata'
-    method_id = 'hyperband-%s-n%d-%d' % (dataset, n_workers, random_state)
-    hyperband = mqHyperband(None, cs, R, eta=eta, method_id=method_id, ip=ip, port=port,
-                            restart_needed=True, time_limit_per_trial=600)
-    hyperband.num_iter = 1              # set repeat num of hyperband
+    method_id = 'hyperband-n%d-%s-%04d' % (n_workers, dataset, seed)
+    hyperband = mqHyperband(None, cs, R, eta=eta,
+                            num_iter=1, random_state=seed,
+                            method_id=method_id, restart_needed=True,
+                            time_limit_per_trial=600, ip='', port=port)
     hyperband.runtime_limit = None      # set total runtime limit
     hyperband.run()
 else:

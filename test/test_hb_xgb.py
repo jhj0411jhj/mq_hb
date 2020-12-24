@@ -63,7 +63,7 @@ def load_data(dataset):
     return x_train, x_val, x_test, y_train, y_val, y_test
 
 
-def mf_objective_func(config: dict, n_resource, total_resource, x_train, x_val, y_train, y_val, rng):
+def mf_objective_func(config: dict, n_resource, total_resource, x_train, x_val, y_train, y_val, seed):
     uid = config.pop('uid', 1)
     reference = config.pop('reference', None)
     need_lc = config.pop('need_lc', None)
@@ -75,7 +75,7 @@ def mf_objective_func(config: dict, n_resource, total_resource, x_train, x_val, 
         ratio = n_resource / total_resource
         print('sample data: ratio =', ratio, n_resource, total_resource)
         _x, sample_x, _y, sample_y = train_test_split(x_train, y_train, test_size=ratio,
-                                                      stratify=y_train, random_state=rng)
+                                                      stratify=y_train, random_state=seed)
     else:
         print('sample data: use full dataset', n_resource, total_resource)
         sample_x, sample_y = x_train, y_train
@@ -97,19 +97,18 @@ def mf_objective_func(config: dict, n_resource, total_resource, x_train, x_val, 
 
 cs = XGBoost.get_cs()
 seed = 123
-rng = np.random.RandomState(seed)
 
 if role == 'master':
-    method_id = 'hyperband-%s-n%d-%d' % (dataset, n_workers, seed)
+    method_id = 'hyperband-n%d-%s-%04d' % (n_workers, dataset, seed)
     hyperband = mqHyperband(None, cs, R, eta=eta,
                             num_iter=num_iter, random_state=seed,
                             method_id=method_id, restart_needed=True,
-                            time_limit_per_trial=600, ip=ip, port=port)
+                            time_limit_per_trial=600, ip='', port=port)
     hyperband.runtime_limit = runtime_limit     # set total runtime limit
     hyperband.run()
 else:
     x_train, x_val, x_test, y_train, y_val, y_test = load_data(dataset)
-    mf_objective_func = partial(mf_objective_func, total_resource=R, rng=rng,
+    mf_objective_func = partial(mf_objective_func, total_resource=R, seed=seed,
                                 x_train=x_train, x_val=x_val, y_train=y_train, y_val=y_val)
     worker = mqmfWorker(mf_objective_func, ip, port)
     worker.run()
