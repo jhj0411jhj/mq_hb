@@ -22,6 +22,7 @@ sys.path.insert(0, "../lite-bo")    # for dependency
 from mq_hb.mq_hb import mqHyperband
 from mq_hb.mq_mf_worker import mqmfWorker
 from mq_hb.xgb_model import XGBoost
+from utils import load_data
 
 default_datasets = 'mnist_784,higgs,covertype'
 
@@ -66,24 +67,6 @@ for para in (ip, port, n_jobs, R, eta, n_workers, runtime_limit):
 
 seeds = [4465, 3822, 4531, 8459, 6295, 2854, 7820, 4050, 280, 6983,
          5497, 83, 9801, 8760, 5765, 6142, 4158, 9599, 1776, 1656]
-
-
-def load_data(dataset):
-    data_dir = 'datasets'
-    name_x_train = dataset + '-x_train.npy'
-    name_x_val = dataset + '-x_val.npy'
-    name_x_test = dataset + '-x_test.npy'
-    name_y_train = dataset + '-y_train.npy'
-    name_y_val = dataset + '-y_val.npy'
-    name_y_test = dataset + '-y_test.npy'
-    x_train = np.load(os.path.join(data_dir, name_x_train))
-    x_val = np.load(os.path.join(data_dir, name_x_val))
-    x_test = np.load(os.path.join(data_dir, name_x_test))
-    y_train = np.load(os.path.join(data_dir, name_y_train))
-    y_val = np.load(os.path.join(data_dir, name_y_val))
-    y_test = np.load(os.path.join(data_dir, name_y_test))
-    print(dataset, 'loaded. n_instances =', x_train.shape[0], x_val.shape[0], x_test.shape[0])
-    return x_train, x_val, x_test, y_train, y_val, y_test
 
 
 def evaluate_parallel(method_id, n_workers, dataset, seed, ip, port):
@@ -184,4 +167,4 @@ for dataset in test_datasets:
             os.makedirs(dir_path)
         with open(os.path.join(dir_path, file_name), 'wb') as f:
             pkl.dump(recorder, f)
-        print(dir_path, file_name, 'saved!')
+        print(dir_path, file_name, 'saved!', flush=True)

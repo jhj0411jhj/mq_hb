@@ -1,6 +1,4 @@
-import os
 import argparse
-import numpy as np
 from functools import partial
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import balanced_accuracy_score
@@ -8,11 +6,10 @@ from sklearn.metrics import balanced_accuracy_score
 import sys
 sys.path.append('.')
 sys.path.insert(0, '../lite-bo')    # for dependency
-
 from mq_hb.mq_hb import mqHyperband
 from mq_hb.mq_mf_worker import mqmfWorker
 from mq_hb.xgb_model import XGBoost
-
+from utils import load_data
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--role', type=str, choices=['master', 'worker'])
@@ -43,24 +40,6 @@ print(R, eta)
 print(num_iter, runtime_limit)
 for para in (role, ip, port, n_jobs, R, eta, n_workers):
     assert para is not None
-
-
-def load_data(dataset):
-    data_dir = 'datasets'
-    name_x_train = dataset + '-x_train.npy'
-    name_x_val = dataset + '-x_val.npy'
-    name_x_test = dataset + '-x_test.npy'
-    name_y_train = dataset + '-y_train.npy'
-    name_y_val = dataset + '-y_val.npy'
-    name_y_test = dataset + '-y_test.npy'
-    x_train = np.load(os.path.join(data_dir, name_x_train))
-    x_val = np.load(os.path.join(data_dir, name_x_val))
-    x_test = np.load(os.path.join(data_dir, name_x_test))
-    y_train = np.load(os.path.join(data_dir, name_y_train))
-    y_val = np.load(os.path.join(data_dir, name_y_val))
-    y_test = np.load(os.path.join(data_dir, name_y_test))
-    print(dataset, 'loaded. n_instances =', x_train.shape[0], x_val.shape[0], x_test.shape[0])
-    return x_train, x_val, x_test, y_train, y_val, y_test
 
 
 def mf_objective_func(config, n_resource, extra_conf, total_resource, x_train, x_val, y_train, y_val, seed):
