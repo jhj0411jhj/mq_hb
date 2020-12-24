@@ -2,7 +2,7 @@ from typing import List
 import time
 import numpy as np
 from math import log, ceil
-from mq_base_facade import mqBaseFacade
+from mq_hb.mq_base_facade import mqBaseFacade
 
 from litebo.config_space import Configuration, ConfigurationSpace
 

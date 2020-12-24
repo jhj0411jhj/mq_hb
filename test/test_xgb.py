@@ -5,12 +5,13 @@ from functools import partial
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import balanced_accuracy_score
 
-from mq_hb import mqHyperband
-from mq_mf_worker import mqmfWorker
-from xgb_model import XGBoost
-
 import sys
+sys.path.append('.')
 sys.path.insert(0, '../lite-bo')    # for dependency
+
+from mq_hb.mq_hb import mqHyperband
+from mq_hb.mq_mf_worker import mqmfWorker
+from mq_hb.xgb_model import XGBoost
 
 
 parser = argparse.ArgumentParser()
@@ -23,6 +24,9 @@ parser.add_argument('--eta', type=int, default=3)
 parser.add_argument('--n_workers', type=int)
 parser.add_argument('--dataset', type=str)
 
+parser.add_argument('--num_iter', type=int, default=1)
+parser.add_argument('--runtime_limit', type=int)
+
 args = parser.parse_args()
 role = args.role
 ip = args.ip
@@ -32,8 +36,11 @@ R = args.R
 eta = args.eta
 n_workers = args.n_workers  # Caution: must set for saving result to different dirs
 dataset = args.dataset
+num_iter = args.num_iter
+runtime_limit = args.runtime_limit
 print(role, ip, port, n_jobs, n_workers, dataset)
 print(R, eta)
+print(num_iter, runtime_limit)
 for para in (role, ip, port, n_jobs, R, eta, n_workers):
     assert para is not None
 
@@ -56,7 +63,7 @@ def load_data(dataset):
     return x_train, x_val, x_test, y_train, y_val, y_test
 
 
-def mf_objective_func(config: dict, n_resource, total_resource, x_train, x_val, y_train, y_val, random_state):
+def mf_objective_func(config: dict, n_resource, total_resource, x_train, x_val, y_train, y_val, rng):
     uid = config.pop('uid', 1)
     reference = config.pop('reference', None)
     need_lc = config.pop('need_lc', None)
@@ -68,9 +75,9 @@ def mf_objective_func(config: dict, n_resource, total_resource, x_train, x_val, 
         ratio = n_resource / total_resource
         print('sample data: ratio =', ratio, n_resource, total_resource)
         _x, sample_x, _y, sample_y = train_test_split(x_train, y_train, test_size=ratio,
-                                                      stratify=y_train, random_state=random_state)
+                                                      stratify=y_train, random_state=rng)
     else:
-        print('sample data: use full dataset')
+        print('sample data: use full dataset', n_resource, total_resource)
         sample_x, sample_y = x_train, y_train
 
     model = XGBoost(**config, n_jobs=n_jobs)
@@ -89,18 +96,20 @@ def mf_objective_func(config: dict, n_resource, total_resource, x_train, x_val, 
 
 
 cs = XGBoost.get_cs()
-random_state = 123
+seed = 123
+rng = np.random.RandomState(seed)
 
 if role == 'master':
-    method_id = 'hyperband-%s-n%d-%d' % (dataset, n_workers, random_state)
-    hyperband = mqHyperband(None, cs, R, eta=eta, method_id=method_id, ip=ip, port=port,
-                            restart_needed=True, time_limit_per_trial=600)
-    hyperband.num_iter = 1              # set repeat num of hyperband
-    hyperband.runtime_limit = None      # set total runtime limit
+    method_id = 'hyperband-%s-n%d-%d' % (dataset, n_workers, seed)
+    hyperband = mqHyperband(None, cs, R, eta=eta,
+                            num_iter=num_iter, random_state=seed,
+                            method_id=method_id, restart_needed=True,
+                            time_limit_per_trial=600, ip=ip, port=port)
+    hyperband.runtime_limit = runtime_limit     # set total runtime limit
     hyperband.run()
 else:
     x_train, x_val, x_test, y_train, y_val, y_test = load_data(dataset)
-    mf_objective_func = partial(mf_objective_func, total_resource=R, random_state=random_state,
+    mf_objective_func = partial(mf_objective_func, total_resource=R, rng=rng,
                                 x_train=x_train, x_val=x_val, y_train=y_train, y_val=y_val)
     worker = mqmfWorker(mf_objective_func, ip, port)
     worker.run()

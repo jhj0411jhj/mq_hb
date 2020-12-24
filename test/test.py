@@ -1,11 +1,12 @@
 import argparse
 import numpy as np
-from mq_hb import mqHyperband
-from mq_mf_worker import mqmfWorker
 
 import sys
-sys.path.insert(0, '../lite-bo')
+sys.path.append('.')
+sys.path.insert(0, '../lite-bo')    # for dependency
 from litebo.config_space import ConfigurationSpace, UniformFloatHyperparameter, UniformIntegerHyperparameter
+from mq_hb.mq_hb import mqHyperband
+from mq_hb.mq_mf_worker import mqmfWorker
 
 
 parser = argparse.ArgumentParser()
