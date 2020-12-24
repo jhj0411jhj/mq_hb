@@ -63,12 +63,9 @@ def load_data(dataset):
     return x_train, x_val, x_test, y_train, y_val, y_test
 
 
-def mf_objective_func(config: dict, n_resource, total_resource, x_train, x_val, y_train, y_val, seed):
-    uid = config.pop('uid', 1)
-    reference = config.pop('reference', None)
-    need_lc = config.pop('need_lc', None)
-    method_name = config.pop('method_name', None)
-    print('objective extra info in config:', uid, reference, need_lc, method_name)
+def mf_objective_func(config, n_resource, extra_conf, total_resource, x_train, x_val, y_train, y_val, seed):
+    print('objective extra conf:', extra_conf)
+    params = config.get_dictionary()
 
     # sample train data. the test data after split is sampled train data
     if n_resource < total_resource:
@@ -80,7 +77,7 @@ def mf_objective_func(config: dict, n_resource, total_resource, x_train, x_val, 
         print('sample data: use full dataset', n_resource, total_resource)
         sample_x, sample_y = x_train, y_train
 
-    model = XGBoost(**config, n_jobs=n_jobs)
+    model = XGBoost(**params, n_jobs=n_jobs)
     model.fit(sample_x, sample_y)
 
     # evaluate on validation data

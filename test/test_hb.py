@@ -4,7 +4,8 @@ import numpy as np
 import sys
 sys.path.append('.')
 sys.path.insert(0, '../lite-bo')    # for dependency
-from litebo.config_space import ConfigurationSpace, UniformFloatHyperparameter, UniformIntegerHyperparameter
+from litebo.config_space import ConfigurationSpace, Configuration, \
+    UniformFloatHyperparameter, UniformIntegerHyperparameter
 from mq_hb.mq_hb import mqHyperband
 from mq_hb.mq_mf_worker import mqmfWorker
 
@@ -39,12 +40,9 @@ def get_cs():
     return cs
 
 
-def mf_objective_func(config: dict, n_resource):
-    uid = config.pop('uid', 1)
-    reference = config.pop('reference', None)
-    need_lc = config.pop('need_lc', None)
-    method_name = config.pop('method_name', None)
-    print('objective extra info in config:', uid, reference, need_lc, method_name)
+def mf_objective_func(config: Configuration, n_resource, extra_conf=None):
+    print('objective extra conf:', extra_conf)
+    params = config.get_dictionary()
 
     # todo sample data
     def sample_data(n_resource, total_resource=R):
@@ -59,9 +57,9 @@ def mf_objective_func(config: dict, n_resource):
     # y_pred = model.predict(x_test)
     # return 1 - balanced_accuracy_score(y_test, y_pred)
 
-    n_estimators = config['n_estimators']
-    num_leaves = config['num_leaves']
-    learning_rate = config['learning_rate']
+    n_estimators = params['n_estimators']
+    num_leaves = params['num_leaves']
+    learning_rate = params['learning_rate']
     perf = n_estimators + num_leaves + learning_rate + np.random.rand()/10000
 
     result = dict(

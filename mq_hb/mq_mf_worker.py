@@ -27,7 +27,7 @@ class mqmfWorker(object):
                 time.sleep(1)
                 continue
             print("Worker: get config. start working.")
-            config, time_limit_per_trial, n_iteration, trail_id = msg
+            config, extra_conf, time_limit_per_trial, n_iteration, trail_id = msg
 
             # Start working
             start_time = time.time()
@@ -35,7 +35,7 @@ class mqmfWorker(object):
             ref_id = None
             early_stop = False
             try:
-                args, kwargs = (config, n_iteration), dict()
+                args, kwargs = (config, n_iteration, extra_conf), dict()
                 timeout_status, _result = time_limit(self.objective_function,
                                                      time_limit_per_trial,
                                                      args=args, kwargs=kwargs)

@@ -92,20 +92,20 @@ class mqBaseFacade(object):
         # incorporate ref info.
         conf_list = []
         for index, config in enumerate(configurations):
-            conf_dict = config.get_dictionary().copy()
+            extra_conf_dict = dict()
             if count_dict[config] > 1:
-                conf_dict['uid'] = count_dict[config]
+                extra_conf_dict['uid'] = count_dict[config]
                 count_dict[config] -= 1
 
             if extra_info is not None:
-                conf_dict['reference'] = extra_info[index]
-            conf_dict['need_lc'] = self.record_lc
-            conf_dict['method_name'] = self.method_name
-            conf_list.append(conf_dict)
+                extra_conf_dict['reference'] = extra_info[index]
+            extra_conf_dict['need_lc'] = self.record_lc
+            extra_conf_dict['method_name'] = self.method_name
+            conf_list.append((config, extra_conf_dict))
 
         # Add batch configs to masterQueue.
-        for config in conf_list:
-            msg = [config, self.time_limit_per_trial, n_iteration, self.global_trial_counter]
+        for config, extra_conf in conf_list:
+            msg = [config, extra_conf, self.time_limit_per_trial, n_iteration, self.global_trial_counter]
             self.master_messager.send_message(msg)
             self.global_trial_counter += 1
         self.logger.info('Master: %d configs sent.' % (len(conf_list)))

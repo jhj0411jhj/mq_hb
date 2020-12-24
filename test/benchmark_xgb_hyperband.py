@@ -92,12 +92,9 @@ def evaluate_parallel(method_id, n_workers, dataset, seed, ip, port):
         port = 13579 + np.random.randint(1000)
     print('ip=', ip, 'port=', port)
 
-    def mf_objective_func(config: dict, n_resource, total_resource, x_train, x_val, y_train, y_val, seed):
-        uid = config.pop('uid', 1)
-        reference = config.pop('reference', None)
-        need_lc = config.pop('need_lc', None)
-        method_name = config.pop('method_name', None)
-        print('objective extra info in config:', uid, reference, need_lc, method_name)
+    def mf_objective_func(config, n_resource, extra_conf, total_resource, x_train, x_val, y_train, y_val, seed):
+        print('objective extra conf:', extra_conf)
+        params = config.get_dictionary()
 
         # sample train data. the test data after split is sampled train data
         if n_resource < total_resource:
@@ -109,7 +106,7 @@ def evaluate_parallel(method_id, n_workers, dataset, seed, ip, port):
             print('sample data: use full dataset', n_resource, total_resource)
             sample_x, sample_y = x_train, y_train
 
-        model = XGBoost(**config, n_jobs=n_jobs)
+        model = XGBoost(**params, n_jobs=n_jobs)
         model.fit(sample_x, sample_y)
 
         # evaluate on validation data
@@ -132,7 +129,7 @@ def evaluate_parallel(method_id, n_workers, dataset, seed, ip, port):
         hyperband = mqHyperband(None, cs, R, eta=eta,
                                 num_iter=num_iter, random_state=seed,
                                 method_id=method_id, restart_needed=True,
-                                time_limit_per_trial=600, ip='', port=port)
+                                time_limit_per_trial=600, ip='', port=port)     # todo time_limit_per_trial!!
         hyperband.runtime_limit = runtime_limit  # set total runtime limit
         hyperband.run()
         return_list.extend(hyperband.recorder)  # send to return list
