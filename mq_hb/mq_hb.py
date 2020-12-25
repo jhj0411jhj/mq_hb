@@ -1,22 +1,10 @@
-from typing import List
 import time
 import numpy as np
 from math import log, ceil
 from mq_hb.mq_base_facade import mqBaseFacade
+from mq_hb.utils import sample_configurations
 
-from litebo.config_space import Configuration, ConfigurationSpace
-
-
-# TODO: escape the bug.
-def sample_configurations(configuration_space: ConfigurationSpace, num: int) -> List[Configuration]:
-    result = []
-    cnt = 0
-    while cnt < num:
-        config = configuration_space.sample_configuration(1)
-        if config not in result:
-            result.append(config)
-            cnt += 1
-    return result
+from litebo.config_space import ConfigurationSpace
 
 
 class mqHyperband(mqBaseFacade):
@@ -27,7 +15,7 @@ class mqHyperband(mqBaseFacade):
                  config_space: ConfigurationSpace,
                  R,
                  eta=3,
-                 num_iter=1,
+                 num_iter=10000,
                  random_state=1,
                  method_id='Default',
                  restart_needed=True,
@@ -102,6 +90,7 @@ class mqHyperband(mqBaseFacade):
             if not np.isnan(incumbent_loss):
                 self.incumbent_configs.append(T[0])
                 self.incumbent_perfs.append(incumbent_loss)
+            # self.remove_immediate_model()
 
     def run(self, skip_last=0):
         try:
@@ -118,6 +107,8 @@ class mqHyperband(mqBaseFacade):
         except Exception as e:
             print(e)
             self.logger.error(str(e))
+            # Clean the immediate results.
+            # self.remove_immediate_model()
 
     def get_incumbent(self, num_inc=1):
         assert(len(self.incumbent_perfs) == len(self.incumbent_configs))

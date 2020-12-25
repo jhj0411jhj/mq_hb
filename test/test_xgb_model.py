@@ -5,7 +5,7 @@ import sys
 sys.path.append('.')
 sys.path.insert(0, '../lite-bo')    # for dependency
 from mq_hb.xgb_model import XGBoost
-from mq_hb.mq_hb import sample_configurations
+from mq_hb.utils import sample_configurations
 from utils import load_data, timeit
 
 parser = argparse.ArgumentParser()
