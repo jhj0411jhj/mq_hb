@@ -153,30 +153,31 @@ class mqBaseFacade(object):
         return performance_result, early_stops
 
     def save_intemediate_statistics(self, save_stage=False):
-        file_name = '%s.npy' % self.method_name
-        x = np.array(self._history['time_elapsed'])
-        y = np.array(self._history['performance'])
-        np.save(os.path.join(self.data_directory, file_name), np.array([x, y]))
-
-        config_file_name = 'config_%s.pkl' % self.method_name
-        with open(os.path.join(self.data_directory, config_file_name), 'wb') as f:
-            pkl.dump(self.global_incumbent_configuration, f)
-
-        record_file_name = 'record_%s.pkl' % self.method_name
-        with open(os.path.join(self.data_directory, record_file_name), 'wb') as f:
-            pkl.dump(self.recorder, f)
-
-        if save_stage:
-            stage_file_name = 'stage_%s.npy' % self.method_name
-            stage_x = np.array(self.stage_history['stage_id'])
-            stage_y = np.array(self.stage_history['performance'])
-            np.save(os.path.join(self.data_directory, stage_file_name), np.array([stage_x, stage_y]))
-
-        if PLOT:
-            plt.plot(x, y)
-            plt.xlabel('Time elapsed (sec)')
-            plt.ylabel('Validation error')
-            plt.savefig("data/%s.png" % self.method_name)
+        # file_name = '%s.npy' % self.method_name
+        # x = np.array(self._history['time_elapsed'])
+        # y = np.array(self._history['performance'])
+        # np.save(os.path.join(self.data_directory, file_name), np.array([x, y]))
+        #
+        # config_file_name = 'config_%s.pkl' % self.method_name
+        # with open(os.path.join(self.data_directory, config_file_name), 'wb') as f:
+        #     pkl.dump(self.global_incumbent_configuration, f)
+        #
+        # record_file_name = 'record_%s.pkl' % self.method_name
+        # with open(os.path.join(self.data_directory, record_file_name), 'wb') as f:
+        #     pkl.dump(self.recorder, f)
+        #
+        # if save_stage:
+        #     stage_file_name = 'stage_%s.npy' % self.method_name
+        #     stage_x = np.array(self.stage_history['stage_id'])
+        #     stage_y = np.array(self.stage_history['performance'])
+        #     np.save(os.path.join(self.data_directory, stage_file_name), np.array([stage_x, stage_y]))
+        #
+        # if PLOT:
+        #     plt.plot(x, y)
+        #     plt.xlabel('Time elapsed (sec)')
+        #     plt.ylabel('Validation error')
+        #     plt.savefig("data/%s.png" % self.method_name)
+        return
 
     def _get_logger(self, name):
         logger_name = 'mfes_%s' % name

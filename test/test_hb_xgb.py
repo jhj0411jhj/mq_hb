@@ -1,3 +1,11 @@
+"""
+example cmdline:
+
+python test_hb_xgb.py --role master --ip '' --n_worker 1 --dataset spambase --R 27
+python test_hb_xgb.py --role worker --ip 127.0.0.1 --n_worker 1 --dataset spambase --R 27
+
+"""
+
 import argparse
 from functools import partial
 from sklearn.model_selection import train_test_split

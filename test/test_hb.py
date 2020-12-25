@@ -1,3 +1,11 @@
+"""
+example cmdline:
+
+python test_hb.py --role master --ip '' --n_worker 1 --R 27
+python test_hb.py --role worker --ip 127.0.0.1 --n_worker 1 --R 27
+
+"""
+
 import argparse
 import numpy as np
 
