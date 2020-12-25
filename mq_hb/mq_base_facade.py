@@ -113,7 +113,7 @@ class mqBaseFacade(object):
         result_num = 0
         result_needed = len(conf_list)
         while True:
-            observation = self.master_messager.receive_message()    # return_info, time_taken, trail_id, config
+            observation = self.master_messager.receive_message()    # return_info, time_taken, trial_id, config
             if observation is None:
                 # Wait for workers.
                 # self.logger.info("Master: wait for worker results. sleep 1s.")
@@ -129,19 +129,19 @@ class mqBaseFacade(object):
 
         # get the evaluation statistics
         for observation, global_time in self.trial_statistics:
-            return_info, time_taken, trail_id, config = observation
+            return_info, time_taken, trial_id, config = observation
 
             performance = return_info['loss']
             if performance < self.global_incumbent:
                 self.global_incumbent = performance
                 self.global_incumbent_configuration = config
 
-            self.add_history(global_time, self.global_incumbent, trail_id,
+            self.add_history(global_time, self.global_incumbent, trial_id,
                              self.global_incumbent_configuration)
             # TODO: old version => performance_result.append(performance)
             performance_result.append(return_info)
             early_stops.append(return_info.get('early_stop', False))
-            self.recorder.append({'trial_id': trail_id, 'time_consumed': time_taken,
+            self.recorder.append({'trial_id': trial_id, 'time_consumed': time_taken,
                                   'configuration': config, 'n_iteration': n_iteration,
                                   'return_info': return_info, 'global_time': global_time})
 

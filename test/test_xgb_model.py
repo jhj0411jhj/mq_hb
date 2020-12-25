@@ -26,7 +26,7 @@ def objective_func(config, x_train, x_val, y_train, y_val):
 
     # evaluate on validation data
     y_pred = model.predict(x_val)
-    perf = 1 - balanced_accuracy_score(y_val, y_pred)
+    perf = -balanced_accuracy_score(y_val, y_pred)  # minimize
 
     result = dict(
         objective_value=perf,

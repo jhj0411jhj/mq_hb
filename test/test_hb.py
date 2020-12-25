@@ -44,7 +44,6 @@ def mf_objective_func(config: Configuration, n_resource, extra_conf=None):
     print('objective extra conf:', extra_conf)
     params = config.get_dictionary()
 
-    # todo sample data
     def sample_data(n_resource, total_resource=R):
         print('sample data:', n_resource, total_resource)
         return None

@@ -31,3 +31,4 @@ dist
 logs/
 data/
 datasets/
+smac3-output*

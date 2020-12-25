@@ -1,8 +1,8 @@
 """
 example cmdline:
 
-python test/benchmark_xgb_hyperband.py --datasets higgs --n_jobs 4 --n_workers 1 \
---num_iter 10000 --runtime_limit 7200 --rep 1 --start_id 0
+python test/benchmark_xgb_hyperband.py --datasets spambase --R 27 --n_jobs 4 --n_workers 1 \
+--num_iter 10000 --runtime_limit 60 --rep 1 --start_id 0
 
 """
 
@@ -28,7 +28,7 @@ default_datasets = 'mnist_784,higgs,covertype'
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--datasets', type=str, default=default_datasets)
-parser.add_argument('--R', type=int, default=81)
+parser.add_argument('--R', type=int, default=27)
 parser.add_argument('--eta', type=int, default=3)
 parser.add_argument('--n_jobs', type=int, default=4)
 
@@ -37,7 +37,8 @@ parser.add_argument('--port', type=int, default=0)
 parser.add_argument('--n_workers', type=int)        # must set
 
 parser.add_argument('--num_iter', type=int, default=10000)
-parser.add_argument('--runtime_limit', type=int)    # must set
+parser.add_argument('--runtime_limit', type=int, default=60)
+parser.add_argument('--time_limit_per_trial', type=int, default=600)
 
 parser.add_argument('--rep', type=int, default=1)
 parser.add_argument('--start_id', type=int, default=0)
@@ -47,14 +48,15 @@ test_datasets = args.datasets.split(',')
 print("datasets num=", len(test_datasets))
 R = args.R
 eta = args.eta
-n_jobs = args.n_jobs
+n_jobs = args.n_jobs                                # changed according to dataset
 
 ip = args.ip
 port = args.port
 n_workers = args.n_workers  # Caution: must set for saving result to different dirs
 
 num_iter = args.num_iter
-runtime_limit = args.runtime_limit  # Caution: must set for benchmark
+runtime_limit = args.runtime_limit                  # changed according to dataset
+time_limit_per_trial = args.time_limit_per_trial    # changed according to dataset
 
 rep = args.rep
 start_id = args.start_id
@@ -70,7 +72,7 @@ seeds = [4465, 3822, 4531, 8459, 6295, 2854, 7820, 4050, 280, 6983,
 
 
 def evaluate_parallel(method_id, n_workers, dataset, seed, ip, port):
-    print(n_workers, dataset, seed)
+    print(method_id, n_workers, dataset, seed)
     if port == 0:
         port = 13579 + np.random.randint(1000)
     print('ip=', ip, 'port=', port)
@@ -94,7 +96,7 @@ def evaluate_parallel(method_id, n_workers, dataset, seed, ip, port):
 
         # evaluate on validation data
         y_pred = model.predict(x_val)
-        perf = 1 - balanced_accuracy_score(y_val, y_pred)
+        perf = -balanced_accuracy_score(y_val, y_pred)  # minimize
 
         result = dict(
             objective_value=perf,
@@ -112,7 +114,8 @@ def evaluate_parallel(method_id, n_workers, dataset, seed, ip, port):
         hyperband = mqHyperband(None, cs, R, eta=eta,
                                 num_iter=num_iter, random_state=seed,
                                 method_id=method_id, restart_needed=True,
-                                time_limit_per_trial=600, ip='', port=port)     # todo time_limit_per_trial!!
+                                time_limit_per_trial=time_limit_per_trial,
+                                ip='', port=port)
         hyperband.runtime_limit = runtime_limit  # set total runtime limit
         hyperband.run()
         return_list.extend(hyperband.recorder)  # send to return list
@@ -150,14 +153,34 @@ def check_datasets(datasets):
             raise
 
 
+def setup_exp(_dataset):
+    global n_jobs, runtime_limit, time_limit_per_trial
+    if _dataset == 'mnist_784':
+        n_jobs = 8
+        runtime_limit = 24 * 3600           # 24h
+        time_limit_per_trial = 2 * 3600     # 2h
+    elif _dataset == 'higgs':
+        n_jobs = 4
+        runtime_limit = 3 * 3600            # 3h
+        time_limit_per_trial = 600          # 10min
+    elif _dataset == 'covertype':
+        n_jobs = 4
+        runtime_limit = 10 * 3600           # 10h
+        time_limit_per_trial = 1200         # 20min
+
+
 check_datasets(test_datasets)
 for dataset in test_datasets:
+    # setup
+    setup_exp(dataset)
+    print('===== start eval %s: rep=%d, n_jobs=%d, runtime_limit=%d, time_limit_per_trial=%d'
+          % (dataset, rep, n_jobs, runtime_limit, time_limit_per_trial))
     for i in range(start_id, start_id + rep):
         seed = seeds[i]
 
         timestamp = time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime(time.time()))
         method_str = 'hyperband-n%d' % (n_workers,)
-        method_id = 'hyperband-n%d-%s-%d-%s' % (n_workers, dataset, seed, timestamp)
+        method_id = method_str + '-%s-%d-%s' % (dataset, seed, timestamp)
 
         recorder = evaluate_parallel(method_id, n_workers, dataset, seed, ip, port)
 

@@ -27,7 +27,7 @@ class mqmfWorker(object):
                 time.sleep(1)
                 continue
             print("Worker: get config. start working.")
-            config, extra_conf, time_limit_per_trial, n_iteration, trail_id = msg
+            config, extra_conf, time_limit_per_trial, n_iteration, trial_id = msg
 
             # Start working
             start_time = time.time()
@@ -63,8 +63,8 @@ class mqmfWorker(object):
             return_info = dict(loss=perf,
                                ref_id=ref_id,
                                early_stop=early_stop,
-                               trail_state=trial_state)
-            observation = [return_info, time_taken, trail_id, config]
+                               trial_state=trial_state)
+            observation = [return_info, time_taken, trial_id, config]
 
             # Send result
             print("Worker: perf=%f. time=%d. sending result." % (perf, int(time_taken)))

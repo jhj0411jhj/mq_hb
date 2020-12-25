@@ -61,7 +61,7 @@ def mf_objective_func(config, n_resource, extra_conf, total_resource, x_train, x
 
     # evaluate on validation data
     y_pred = model.predict(x_val)
-    perf = 1 - balanced_accuracy_score(y_val, y_pred)
+    perf = -balanced_accuracy_score(y_val, y_pred)  # minimize
 
     result = dict(
         objective_value=perf,
