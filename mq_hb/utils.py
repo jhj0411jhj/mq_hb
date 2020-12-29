@@ -13,3 +13,14 @@ def sample_configurations(configuration_space: ConfigurationSpace, num: int) -> 
             cnt += 1
     return result
 
+
+def expand_configurations(configs: List[Configuration], configuration_space: ConfigurationSpace, num: int):
+    num_config = len(configs)
+    num_needed = num - num_config
+    config_cnt = 0
+    while config_cnt < num_needed:
+        config = configuration_space.sample_configuration(1)
+        if config not in configs:
+            configs.append(config)
+            config_cnt += 1
+    return configs

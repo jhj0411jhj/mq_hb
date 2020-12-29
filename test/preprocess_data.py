@@ -8,8 +8,9 @@ from solnml.datasets.utils import load_data
 from solnml.components.utils.constants import MULTICLASS_CLS
 
 data_dir = '../soln-ml/'
-datasets = ['mnist_784', 'higgs', 'covertype']
+# datasets = ['mnist_784', 'higgs', 'covertype']
 # datasets = ['spambase', ]
+# datasets = ['covtype', 'codrna']
 
 new_data_dir = 'datasets'
 if not os.path.exists(new_data_dir):

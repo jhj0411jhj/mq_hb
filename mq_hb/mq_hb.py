@@ -17,25 +17,25 @@ class mqHyperband(mqBaseFacade):
                  eta=3,
                  num_iter=10000,
                  random_state=1,
-                 method_id='Default',
+                 method_id='mqHyperband',
                  restart_needed=True,
                  time_limit_per_trial=600,
                  ip='',
-                 port=13579,):
+                 port=13579, ):
         max_queue_len = 3 * R   # conservative design
-        super(mqHyperband, self).__init__(objective_func, method_name=method_id,
-                                          restart_needed=restart_needed, time_limit_per_trial=time_limit_per_trial,
-                                          max_queue_len=max_queue_len, ip=ip, port=port)
+        super().__init__(objective_func, method_name=method_id,
+                         restart_needed=restart_needed, time_limit_per_trial=time_limit_per_trial,
+                         max_queue_len=max_queue_len, ip=ip, port=port)
         self.seed = random_state
         self.configuration_space = config_space
         self.configuration_space.seed(self.seed)
 
         self.num_iter = num_iter
-        self.max_iter = R  	    # Maximum iterations per configuration
-        self.eta = eta			# Define configuration downsampling rate (default = 3)
+        self.R = R      # Maximum iterations per configuration
+        self.eta = eta  # Define configuration downsampling rate (default = 3)
         self.logeta = lambda x: log(x) / log(self.eta)
-        self.s_max = int(self.logeta(self.max_iter))
-        self.B = (self.s_max + 1) * self.max_iter
+        self.s_max = int(self.logeta(self.R))
+        self.B = (self.s_max + 1) * self.R
 
         self.incumbent_configs = list()
         self.incumbent_perfs = list()
@@ -44,12 +44,12 @@ class mqHyperband(mqBaseFacade):
     def iterate(self, skip_last=0):
         for s in reversed(range(self.s_max + 1)):
             # Initial number of configurations
-            n = int(ceil(self.B / self.max_iter / (s + 1) * self.eta ** s))
+            n = int(ceil(self.B / self.R / (s + 1) * self.eta ** s))
             # Initial number of iterations per config
-            r = self.max_iter * self.eta ** (-s)
+            r = self.R * self.eta ** (-s)
 
-            # Sample n configurations uniformly.
-            T = sample_configurations(self.configuration_space, n)
+            # Choose next n configurations.
+            T = self.choose_next(n)
             incumbent_loss = np.inf
             extra_info = None
             last_run_num = None
@@ -87,31 +87,42 @@ class mqHyperband(mqBaseFacade):
                 incumbent_loss = val_losses[indices[0]]
                 self.add_stage_history(self.stage_id, min(self.global_incumbent, incumbent_loss))
                 self.stage_id += 1
-            if not np.isnan(incumbent_loss):
-                self.incumbent_configs.append(T[0])
-                self.incumbent_perfs.append(incumbent_loss)
+            self.update_incumbent(T, val_losses, indices, n_iterations)
             # self.remove_immediate_model()
 
     def run(self, skip_last=0):
         try:
             for iter in range(self.num_iter):
-                self.logger.info('-'*50)
+                self.logger.info('-' * 50)
                 self.logger.info("HB algorithm: %d/%d iteration starts" % (iter, self.num_iter))
                 start_time = time.time()
                 self.iterate(skip_last=skip_last)
-                time_elapsed = (time.time() - start_time)/60
+                time_elapsed = (time.time() - start_time) / 60
                 self.logger.info("Iteration took %.2f min." % time_elapsed)
                 self.save_intemediate_statistics()
             for i, obj in enumerate(self.incumbent_perfs):
-                self.logger.info('%d-th config: %s, obj: %f.' % (i+1, str(self.incumbent_configs[i]), self.incumbent_perfs[i]))
+                self.logger.info(
+                    '%d-th config: %s, obj: %f.' % (i + 1, str(self.incumbent_configs[i]), self.incumbent_perfs[i]))
         except Exception as e:
             print(e)
             self.logger.error(str(e))
             # Clean the immediate results.
             # self.remove_immediate_model()
 
+    def choose_next(self, num_config):
+        # Sample n configurations uniformly.
+        return sample_configurations(self.configuration_space, num_config)
+
+    def update_incumbent(self, T, val_losses, indices, n_iterations):
+        assert int(n_iterations) == self.R
+        incumbent_loss = val_losses[indices[0]]
+        if not np.isnan(incumbent_loss):
+            self.incumbent_configs.append(T[0])
+            self.incumbent_perfs.append(incumbent_loss)
+
     def get_incumbent(self, num_inc=1):
-        assert(len(self.incumbent_perfs) == len(self.incumbent_configs))
+        assert (len(self.incumbent_perfs) == len(self.incumbent_configs))
         indices = np.argsort(self.incumbent_perfs)
-        return [self.incumbent_configs[i] for i in indices[0:num_inc]], \
-               [self.incumbent_perfs[i] for i in indices[0: num_inc]]
+        configs = [self.incumbent_configs[i] for i in indices[0:num_inc]]
+        perfs = [self.incumbent_perfs[i] for i in indices[0: num_inc]]
+        return configs, perfs

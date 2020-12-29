@@ -1,3 +1,10 @@
+"""
+example cmdline:
+
+python test/test_xgb_model.py --dataset spambase --n_jobs 4 --rep 1
+
+"""
+
 import argparse
 from sklearn.metrics import balanced_accuracy_score
 
@@ -21,7 +28,7 @@ rep = args.rep
 
 def objective_func(config, x_train, x_val, y_train, y_val):
     conf_dict = config.get_dictionary()
-    model = XGBoost(**conf_dict, n_jobs=n_jobs)
+    model = XGBoost(**conf_dict, n_jobs=n_jobs, seed=seed)
     model.fit(x_train, y_train)
 
     # evaluate on validation data

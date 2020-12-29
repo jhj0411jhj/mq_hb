@@ -61,6 +61,7 @@ class mqmfWorker(object):
 
             time_taken = time.time() - start_time
             return_info = dict(loss=perf,
+                               n_iteration=n_iteration,
                                ref_id=ref_id,
                                early_stop=early_stop,
                                trial_state=trial_state)

@@ -13,15 +13,15 @@ class mqRandomSearch(mqBaseFacade):
                  n_workers=1,
                  num_iter=10000,
                  random_state=1,
-                 method_id="Default",
+                 method_id='mqRandomSearch',
                  restart_needed=True,
                  time_limit_per_trial=600,
                  ip='',
-                 port=13579,):
+                 port=13579, ):
         max_queue_len = max(100, 3 * n_workers)  # conservative design
-        super(mqRandomSearch, self).__init__(objective_func, method_name=method_id,
-                                             restart_needed=restart_needed, time_limit_per_trial=time_limit_per_trial,
-                                             max_queue_len=max_queue_len, ip=ip, port=port)
+        super().__init__(objective_func, method_name=method_id,
+                         restart_needed=restart_needed, time_limit_per_trial=time_limit_per_trial,
+                         max_queue_len=max_queue_len, ip=ip, port=port)
         self.seed = random_state
         self.config_space = config_space
         self.config_space.seed(self.seed)

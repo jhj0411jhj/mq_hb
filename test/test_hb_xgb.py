@@ -1,8 +1,8 @@
 """
 example cmdline:
 
-python test_hb_xgb.py --role master --ip '' --n_worker 1 --dataset spambase --R 27
-python test_hb_xgb.py --role worker --ip 127.0.0.1 --n_worker 1 --dataset spambase --R 27
+python test/test_hb_xgb.py --role master --ip '' --n_worker 1 --dataset spambase --R 27
+python test/test_hb_xgb.py --role worker --ip 127.0.0.1 --n_worker 1 --dataset spambase --R 27
 
 """
 
@@ -63,8 +63,9 @@ def mf_objective_func(config, n_resource, extra_conf, total_resource, x_train, x
     else:
         print('sample data: use full dataset', n_resource, total_resource)
         sample_x, sample_y = x_train, y_train
+    print('data len:', len(sample_x), len(x_train))
 
-    model = XGBoost(**params, n_jobs=n_jobs)
+    model = XGBoost(**params, n_jobs=n_jobs, seed=seed)
     model.fit(sample_x, sample_y)
 
     # evaluate on validation data

@@ -15,7 +15,7 @@ from sklearn.metrics import balanced_accuracy_score
 sys.path.append(".")
 sys.path.insert(0, "../lite-bo")    # for dependency
 from mq_hb.xgb_model import XGBoost
-from utils import load_data
+from utils import load_data, setup_exp
 
 default_datasets = 'mnist_784,higgs,covertype'
 
@@ -54,7 +54,7 @@ def evaluate(method_id, dataset, seed):
 
     def objective_func(config):
         params = config.get_dictionary()
-        model = XGBoost(**params, n_jobs=n_jobs)
+        model = XGBoost(**params, n_jobs=n_jobs, seed=seed)
         model.fit(x_train, y_train)
         # evaluate on validation data
         y_pred = model.predict(x_val)
@@ -95,26 +95,10 @@ def check_datasets(datasets):
             raise
 
 
-def setup_exp(_dataset):
-    global n_jobs, runtime_limit, time_limit_per_trial
-    if _dataset == 'mnist_784':
-        n_jobs = 8
-        runtime_limit = 24 * 3600           # 24h
-        time_limit_per_trial = 2 * 3600     # 2h
-    elif _dataset == 'higgs':
-        n_jobs = 4
-        runtime_limit = 3 * 3600            # 3h
-        time_limit_per_trial = 600          # 10min
-    elif _dataset == 'covertype':
-        n_jobs = 4
-        runtime_limit = 10 * 3600           # 10h
-        time_limit_per_trial = 1200         # 20min
-
-
 check_datasets(test_datasets)
 for dataset in test_datasets:
     # setup
-    setup_exp(dataset)
+    n_jobs, runtime_limit, time_limit_per_trial = setup_exp(dataset, n_jobs, runtime_limit, time_limit_per_trial)
     print('===== start eval %s: rep=%d, n_jobs=%d, runtime_limit=%d, time_limit_per_trial=%d'
           % (dataset, rep, n_jobs, runtime_limit, time_limit_per_trial))
     for i in range(start_id, start_id + rep):
