@@ -1,3 +1,4 @@
+import argparse
 import os
 import numpy as np
 import pickle as pkl
@@ -5,10 +6,20 @@ import matplotlib.pyplot as plt
 
 from utils import setup_exp
 
+# default_datasets = 'mnist_784,higgs,covertype'
+default_datasets = 'covtype,codrna'
+default_mths = 'random-n1,random-n3,smac,hyperband-n1,hyperband-n3'
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--datasets', type=str, default=default_datasets)
+parser.add_argument('--mths', type=str, default=default_mths)
+parser.add_argument('--R', type=int, default=27)
+
+args = parser.parse_args()
+test_datasets = args.datasets.split(',')
+mths = args.mths.split(',')
+R = args.R
 model = 'xgb'
-test_datasets = ['mnist_784', 'higgs', 'covertype']
-mths = ['random-n1', 'random-n3', 'smac', 'hyperband-n1', 'hyperband-n3']
-R = 27  # max_iter
 
 
 def descending(x):

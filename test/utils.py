@@ -2,6 +2,7 @@ import os
 import time
 import contextlib
 import numpy as np
+import pickle as pkl
 
 
 # todo !!!
@@ -36,18 +37,24 @@ def setup_exp(_dataset, n_jobs, runtime_limit, time_limit_per_trial):
 
 
 def load_data(dataset, data_dir='datasets'):
-    name_x_train = dataset + '-x_train.npy'
-    name_x_val = dataset + '-x_val.npy'
-    name_x_test = dataset + '-x_test.npy'
-    name_y_train = dataset + '-y_train.npy'
-    name_y_val = dataset + '-y_val.npy'
-    name_y_test = dataset + '-y_test.npy'
-    x_train = np.load(os.path.join(data_dir, name_x_train))
-    x_val = np.load(os.path.join(data_dir, name_x_val))
-    x_test = np.load(os.path.join(data_dir, name_x_test))
-    y_train = np.load(os.path.join(data_dir, name_y_train))
-    y_val = np.load(os.path.join(data_dir, name_y_val))
-    y_test = np.load(os.path.join(data_dir, name_y_test))
+    if dataset == 'codrna':
+        name = dataset + '.pkl'
+        with open(os.path.join(data_dir, name), 'rb') as f:
+            obj = pkl.load(f)
+            x_train, x_val, x_test, y_train, y_val, y_test = obj
+    else:
+        name_x_train = dataset + '-x_train.npy'
+        name_x_val = dataset + '-x_val.npy'
+        name_x_test = dataset + '-x_test.npy'
+        name_y_train = dataset + '-y_train.npy'
+        name_y_val = dataset + '-y_val.npy'
+        name_y_test = dataset + '-y_test.npy'
+        x_train = np.load(os.path.join(data_dir, name_x_train))
+        x_val = np.load(os.path.join(data_dir, name_x_val))
+        x_test = np.load(os.path.join(data_dir, name_x_test))
+        y_train = np.load(os.path.join(data_dir, name_y_train))
+        y_val = np.load(os.path.join(data_dir, name_y_val))
+        y_test = np.load(os.path.join(data_dir, name_y_test))
     print(dataset, 'loaded. n_instances =', x_train.shape[0], x_val.shape[0], x_test.shape[0])
     return x_train, x_val, x_test, y_train, y_val, y_test
 
