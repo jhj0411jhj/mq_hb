@@ -127,6 +127,9 @@ class mqBaseFacade(object):
             if result_num == result_needed:
                 break
 
+        # sort by trial_id. FIX BUG
+        self.trial_statistics.sort(key=lambda x: x[0][2])
+
         # get the evaluation statistics
         for observation, global_time in self.trial_statistics:
             return_info, time_taken, trial_id, config = observation
