@@ -22,9 +22,10 @@ sys.path.insert(0, "../lite-bo")    # for dependency
 from mq_hb.mq_hb import mqHyperband
 from mq_hb.mq_mf_worker import mqmfWorker
 from mq_hb.xgb_model import XGBoost
-from utils import load_data, setup_exp
+from utils import load_data, setup_exp, check_datasets, seeds
 
-default_datasets = 'mnist_784,higgs,covertype'
+# default_datasets = 'mnist_784,higgs,covertype'
+default_datasets = 'covtype,codrna'
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--datasets', type=str, default=default_datasets)
@@ -66,9 +67,6 @@ print(R, eta)
 print(num_iter, runtime_limit)
 for para in (ip, port, n_jobs, R, eta, n_workers, runtime_limit):
     assert para is not None
-
-seeds = [4465, 3822, 4531, 8459, 6295, 2854, 7820, 4050, 280, 6983,
-         5497, 83, 9801, 8760, 5765, 6142, 4158, 9599, 1776, 1656]
 
 
 def evaluate_parallel(method_id, n_workers, dataset, seed, ip, port):
@@ -142,15 +140,6 @@ def evaluate_parallel(method_id, n_workers, dataset, seed, ip, port):
         w.join()
 
     return list(recorder)   # covert to list
-
-
-def check_datasets(datasets):
-    for _dataset in datasets:
-        try:
-            _ = load_data(_dataset)
-        except Exception as e:
-            print('Dataset - %s load error: %s' % (_dataset, str(e)))
-            raise
 
 
 check_datasets(test_datasets)

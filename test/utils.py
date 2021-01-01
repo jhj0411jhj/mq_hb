@@ -4,8 +4,10 @@ import contextlib
 import numpy as np
 import pickle as pkl
 
+seeds = [4465, 3822, 4531, 8459, 6295, 2854, 7820, 4050, 280, 6983,
+         5497, 83, 9801, 8760, 5765, 6142, 4158, 9599, 1776, 1656]
 
-# todo !!!
+
 def setup_exp(_dataset, n_jobs, runtime_limit, time_limit_per_trial):
     if _dataset == 'mnist_784':
         n_jobs = 4
@@ -25,7 +27,7 @@ def setup_exp(_dataset, n_jobs, runtime_limit, time_limit_per_trial):
         time_limit_per_trial = 2 * 3600     # 2h
     elif _dataset == 'codrna':
         n_jobs = 4
-        runtime_limit = 12 * 3600           # 12h
+        runtime_limit = 1 * 3600            # 1h
         time_limit_per_trial = 2 * 3600     # 2h
     else:
         print('[setup exp] dataset setup not found. use input settings.')
@@ -57,6 +59,15 @@ def load_data(dataset, data_dir='datasets'):
         y_test = np.load(os.path.join(data_dir, name_y_test))
     print(dataset, 'loaded. n_instances =', x_train.shape[0], x_val.shape[0], x_test.shape[0])
     return x_train, x_val, x_test, y_train, y_val, y_test
+
+
+def check_datasets(datasets):
+    for _dataset in datasets:
+        try:
+            _ = load_data(_dataset)
+        except Exception as e:
+            print('Dataset - %s load error: %s' % (_dataset, str(e)))
+            raise
 
 
 # timer tool
