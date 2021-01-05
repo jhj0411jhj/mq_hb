@@ -27,8 +27,8 @@ class mqHyperband(mqBaseFacade):
                          restart_needed=restart_needed, time_limit_per_trial=time_limit_per_trial,
                          max_queue_len=max_queue_len, ip=ip, port=port)
         self.seed = random_state
-        self.configuration_space = config_space
-        self.configuration_space.seed(self.seed)
+        self.config_space = config_space
+        self.config_space.seed(self.seed)
 
         self.num_iter = num_iter
         self.R = R      # Maximum iterations per configuration
@@ -64,11 +64,14 @@ class mqHyperband(mqBaseFacade):
                     n_iter -= last_run_num
                 last_run_num = n_iterations
 
-                self.logger.info("HB: %d configurations x %d iterations each" % (int(n_configs), int(n_iterations)))
+                self.logger.info("%s: %d configurations x %d iterations each"
+                                 % (self.method_name, int(n_configs), int(n_iterations)))
 
                 ret_val, early_stops = self.run_in_parallel(T, n_iter, extra_info)
                 val_losses = [item['loss'] for item in ret_val]
                 ref_list = [item['ref_id'] for item in ret_val]
+
+                self.update_incumbent_before_reduce(T, val_losses, n_iterations)
 
                 # select a number of best configurations for the next loop
                 # filter out early stops, if any
@@ -76,25 +79,27 @@ class mqHyperband(mqBaseFacade):
                 if len(T) == sum(early_stops):
                     break
                 if len(T) >= self.eta:
-                    T = [T[i] for i in indices if not early_stops[i]]
-                    extra_info = [ref_list[i] for i in indices if not early_stops[i]]
+                    indices = [i for i in indices if not early_stops[i]]
+                    T = [T[i] for i in indices]
+                    extra_info = [ref_list[i] for i in indices]
                     reduced_num = int(n_configs / self.eta)
                     T = T[0:reduced_num]
                     extra_info = extra_info[0:reduced_num]
                 else:
-                    T = [T[indices[0]]]
+                    T = [T[indices[0]]]     # todo: confirm no filter early stops?
                     extra_info = [ref_list[indices[0]]]
-                incumbent_loss = val_losses[indices[0]]
+                val_losses = [val_losses[i] for i in indices][0:len(T)]     # update: sorted
+                incumbent_loss = val_losses[0]
                 self.add_stage_history(self.stage_id, min(self.global_incumbent, incumbent_loss))
                 self.stage_id += 1
-            self.update_incumbent(T, val_losses, indices, n_iterations)
+                self.update_incumbent_after_reduce(T, val_losses, n_iterations)
             # self.remove_immediate_model()
 
     def run(self, skip_last=0):
         try:
             for iter in range(self.num_iter):
                 self.logger.info('-' * 50)
-                self.logger.info("HB algorithm: %d/%d iteration starts" % (iter, self.num_iter))
+                self.logger.info("%s algorithm: %d/%d iteration starts" % (self.method_name, iter, self.num_iter))
                 start_time = time.time()
                 self.iterate(skip_last=skip_last)
                 time_elapsed = (time.time() - start_time) / 60
@@ -111,11 +116,18 @@ class mqHyperband(mqBaseFacade):
 
     def choose_next(self, num_config):
         # Sample n configurations uniformly.
-        return sample_configurations(self.configuration_space, num_config)
+        return sample_configurations(self.config_space, num_config)
 
-    def update_incumbent(self, T, val_losses, indices, n_iterations):
-        assert int(n_iterations) == self.R
-        incumbent_loss = val_losses[indices[0]]
+    def update_incumbent_before_reduce(self, T, val_losses, n_iterations):
+        return
+
+    def update_incumbent_after_reduce(self, T, val_losses, n_iterations):
+        """
+        update: both T and val_losses are sorted
+        """
+        if int(n_iterations) < self.R:  # todo if skip_last?
+            return
+        incumbent_loss = val_losses[0]
         if not np.isnan(incumbent_loss):
             self.incumbent_configs.append(T[0])
             self.incumbent_perfs.append(incumbent_loss)
