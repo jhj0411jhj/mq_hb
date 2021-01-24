@@ -51,7 +51,7 @@ class XGBoost:
         return self.estimator.predict(X)
 
     @staticmethod
-    def get_cs():
+    def get_cs_new():
         cs = ConfigurationSpace()
         n_estimators = UniformFloatHyperparameter("n_estimators", 100, 1000, q=50, default_value=500)
         max_depth = UniformIntegerHyperparameter("max_depth", 1, 12)
@@ -65,7 +65,7 @@ class XGBoost:
         return cs
 
     @staticmethod
-    def get_cs_old_d():
+    def get_cs():
         cs = ConfigurationSpace()
         n_estimators = UniformFloatHyperparameter("n_estimators", 100, 1000, q=50, default_value=500)
         max_depth = UniformIntegerHyperparameter("max_depth", 1, 12)

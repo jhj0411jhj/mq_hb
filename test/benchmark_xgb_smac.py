@@ -72,7 +72,7 @@ def evaluate(method_id, dataset, seed):
                          "wallclock_limit": runtime_limit,
                          "cutoff_time": time_limit_per_trial,
                          "initial_incumbent": "RANDOM",
-                         # "deterministic": "true",
+                         "deterministic": "true",
                          })
     runhistory = RunHistory_modified(None)  # aggregate_func handled by smac_facade.SMAC
     smac = SMAC(scenario=scenario, runhistory=runhistory,

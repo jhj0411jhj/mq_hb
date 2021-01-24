@@ -132,6 +132,8 @@ for dataset in test_datasets:
                 timestamp = [rec['global_time'] for rec in recorder]
                 perf = descending([rec['return_info']['loss'] for rec in recorder])
                 stats.append((timestamp, perf))
+                # if mth == 'smac':
+                #     plt.plot(timestamp, perf, label=file)
         x, m, s = create_plot_points(stats, 0, runtime_limit, 10000)
         result[mth] = (x, m, s)
         # plot
