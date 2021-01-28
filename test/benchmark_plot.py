@@ -149,7 +149,7 @@ for dataset in test_datasets:
             baseline_time = result[baseline][0][-1]
             x, m, s = result[mth]
             x, m, s = x.tolist(), m.tolist(), s.tolist()
-            mth_time = baseline_time    # if speedup > 1: speedup = 1
+            mth_time = baseline_time    # if speedup < 1: speedup = 1
             for xi, mi, si in zip(x, m, s):
                 if mi <= baseline_perf:
                     mth_time = xi

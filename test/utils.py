@@ -27,8 +27,8 @@ def setup_exp(_dataset, n_jobs, runtime_limit, time_limit_per_trial):
         time_limit_per_trial = 2 * 3600     # 2h
     elif _dataset == 'codrna':
         n_jobs = 4
-        runtime_limit = 1 * 3600            # 1h
-        time_limit_per_trial = 2 * 3600     # 2h
+        runtime_limit = 3000                # 50min
+        time_limit_per_trial = 1200         # 20min
     else:
         print('[setup exp] dataset setup not found. use input settings.')
     print('[setup exp] dataset=%s, n_jobs=%d, runtime_limit=%d, time_limit_per_trial=%d'
