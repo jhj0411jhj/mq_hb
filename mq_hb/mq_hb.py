@@ -4,7 +4,10 @@ from math import log, ceil
 from mq_hb.mq_base_facade import mqBaseFacade
 from mq_hb.utils import sample_configurations
 
-from litebo.config_space import ConfigurationSpace
+try:
+    from litebo.config_space import ConfigurationSpace
+except ImportError as e:
+    from litebo.utils.config_space import ConfigurationSpace
 
 
 class mqHyperband(mqBaseFacade):

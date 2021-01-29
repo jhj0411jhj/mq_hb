@@ -1,5 +1,8 @@
 from typing import List
-from litebo.config_space import Configuration, ConfigurationSpace
+try:
+    from litebo.config_space import Configuration, ConfigurationSpace
+except ImportError as e:
+    from litebo.utils.config_space import Configuration, ConfigurationSpace
 
 
 # TODO: escape the bug.

@@ -1,7 +1,7 @@
 """
 example cmdline:
 
-python test/benchmark_process_record.py --dataset codrna --old 43200 --new 3600
+python test/benchmark_process_record.py --dataset codrna --old 43200 --new 3600 --R 27
 
 """
 import argparse
@@ -64,10 +64,13 @@ for mth in mths:
                 raw_recorder = pkl.load(f)
             recorder = []
             for record in raw_recorder:
-                if record.get('n_iteration') is not None and record['n_iteration'] < R:
-                    if not mth.startswith('hyperband'):
-                        print('error abandon record by n_iteration:', R, mth, record)
-                    continue
+                if record.get('n_iteration') is not None:
+                    if record['n_iteration'] < R:
+                        if not mth.startswith('hyperband'):
+                            print('error abandon record by n_iteration:', R, mth, record)
+                        continue
+                    if record['n_iteration'] > R:
+                        raise ValueError('please check R in settings.', R, mth, record)
                 recorder.append(record)
             # write new
             new_file = 'new_' + file

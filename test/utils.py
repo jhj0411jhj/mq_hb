@@ -9,7 +9,11 @@ seeds = [4465, 3822, 4531, 8459, 6295, 2854, 7820, 4050, 280, 6983,
 
 
 def setup_exp(_dataset, n_jobs, runtime_limit, time_limit_per_trial):
-    if _dataset == 'mnist_784':
+    if _dataset == 'kuaishou1':
+        n_jobs = 8
+        runtime_limit = 24 * 3600           # 24h
+        time_limit_per_trial = 1 * 3600     # 1h
+    elif _dataset == 'mnist_784':
         n_jobs = 4
         runtime_limit = 12 * 3600           # 12h
         time_limit_per_trial = 3 * 3600     # 3h
@@ -38,7 +42,11 @@ def setup_exp(_dataset, n_jobs, runtime_limit, time_limit_per_trial):
     return n_jobs, runtime_limit, time_limit_per_trial
 
 
-def load_data(dataset, data_dir='datasets'):
+def load_data(dataset, data_dir='datasets', **kwargs):
+    if dataset.startswith('kuaishou'):
+        from ks.ks_utils import load_ks_data
+        return load_ks_data(dataset, **kwargs)
+
     if dataset == 'codrna':
         name = dataset + '.pkl'
         with open(os.path.join(data_dir, name), 'rb') as f:
