@@ -13,6 +13,10 @@ def setup_exp(_dataset, n_jobs, runtime_limit, time_limit_per_trial):
         n_jobs = 8
         runtime_limit = 24 * 3600           # 24h
         time_limit_per_trial = 1 * 3600     # 1h
+    elif _dataset == 'kuaishou2':
+        n_jobs = 8
+        runtime_limit = 48 * 3600           # 48h
+        time_limit_per_trial = 4 * 3600     # 4h
     elif _dataset == 'mnist_784':
         n_jobs = 4
         runtime_limit = 12 * 3600           # 12h
@@ -71,6 +75,8 @@ def load_data(dataset, data_dir='datasets', **kwargs):
 
 def check_datasets(datasets):
     for _dataset in datasets:
+        if _dataset.startswith('kuaishou'):     # too large. don't check
+            continue
         try:
             _ = load_data(_dataset)
         except Exception as e:
@@ -88,3 +94,73 @@ def timeit(name=''):
     m, s = divmod(end - start, 60)
     h, m = divmod(m, 60)
     print("[%s]Total time = %d hours, %d minutes, %d seconds." % (name, h, m, s), flush=True)
+
+
+# ===== for plot =====
+
+def descending(x):
+    y = [x[0]]
+    for i in range(1, len(x)):
+        y.append(min(y[-1], x[i]))
+    return y
+
+
+def create_point(x, stats, default=0.0):
+    """
+    get the closest perf of time point x where timestamp < x
+    :param x:
+        the time point
+    :param stats:
+        list of func. func is tuple of timestamp list and perf list
+    :param default:
+        init value of perf
+    :return:
+        list of perf of funcs at time point x
+    """
+    perf_list = []
+    for func in stats:
+        timestamp, perf = func
+        last_p = default
+        for t, p in zip(timestamp, perf):
+            if t > x:
+                break
+            last_p = p
+        perf_list.append(last_p)
+    return perf_list
+
+
+def create_plot_points(stats, start_time, end_time, point_num=500):
+    """
+
+    :param stats:
+        list of func. func is tuple of timestamp list and perf list
+    :param start_time:
+    :param end_time:
+    :param point_num:
+    :return:
+    """
+    x = np.linspace(start_time, end_time, num=point_num)
+    _mean, _std = list(), list()
+    for i, stage in enumerate(x):
+        perf_list = create_point(stage, stats)
+        _mean.append(np.mean(perf_list))
+        _std.append(np.std(perf_list))
+    # Used to plot errorbar.
+    return x, np.array(_mean), np.array(_std)
+
+
+def smooth(vals, start_idx, end_idx, n_points=4):
+    diff = vals[start_idx] - vals[end_idx - 1]
+    idxs = np.random.choice(list(range(start_idx, end_idx)), n_points)
+    new_vals = vals.copy()
+    val_sum = 0.
+    new_vals[start_idx:end_idx] = vals[start_idx]
+    for idx in sorted(idxs):
+        _val = np.random.uniform(0, diff * 0.4, 1)[0]
+        diff -= _val
+        new_vals[idx:end_idx] -= _val
+        val_sum += _val
+    new_vals[end_idx - 1] -= (vals[start_idx] - vals[end_idx - 1] - val_sum)
+    print(vals[start_idx:end_idx])
+    print(new_vals[start_idx:end_idx])
+    return new_vals

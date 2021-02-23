@@ -95,7 +95,7 @@ class mqHyperband(mqBaseFacade):
                 incumbent_loss = val_losses[0]
                 self.add_stage_history(self.stage_id, min(self.global_incumbent, incumbent_loss))
                 self.stage_id += 1
-                self.update_incumbent_after_reduce(T, val_losses, n_iterations)
+            self.update_incumbent_after_reduce(T, incumbent_loss)
             # self.remove_immediate_model()
 
     def run(self, skip_last=0):
@@ -124,13 +124,10 @@ class mqHyperband(mqBaseFacade):
     def update_incumbent_before_reduce(self, T, val_losses, n_iterations):
         return
 
-    def update_incumbent_after_reduce(self, T, val_losses, n_iterations):
+    def update_incumbent_after_reduce(self, T, incumbent_loss):
         """
-        update: both T and val_losses are sorted
+        update: T is sorted
         """
-        if int(n_iterations) < self.R:  # todo if skip_last?
-            return
-        incumbent_loss = val_losses[0]
         if not np.isnan(incumbent_loss):
             self.incumbent_configs.append(T[0])
             self.incumbent_perfs.append(incumbent_loss)

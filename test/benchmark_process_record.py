@@ -9,7 +9,7 @@ import os
 import numpy as np
 import pickle as pkl
 
-default_mths = 'random-n1,random-n3,smac,hyperband-n1,hyperband-n3'
+default_mths = 'random-n1,random-n3,smac,hyperband-n1,hyperband-n3,bohb-n1,bohb-n3'
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', type=str)

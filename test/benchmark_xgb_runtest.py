@@ -21,7 +21,7 @@ from utils import load_data, setup_exp, check_datasets, seeds
 
 # default_datasets = 'mnist_784,higgs,covertype'
 default_datasets = 'covtype,codrna'
-default_mths = 'random-n1,random-n3,smac,hyperband-n1,hyperband-n3'
+default_mths = 'random-n1,random-n3,smac,hyperband-n1,hyperband-n3,bohb-n1,bohb-n3'
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--datasets', type=str, default=default_datasets)
@@ -30,6 +30,7 @@ parser.add_argument('--n_jobs', type=int, default=4)
 parser.add_argument('--rep', type=int, default=1)
 parser.add_argument('--start_id', type=int, default=0)
 parser.add_argument('--show_mode', type=int, default=0)
+parser.add_argument('--runtime_limit', type=int)    # if you don't want to use default setup
 
 args = parser.parse_args()
 test_datasets = args.datasets.split(',')
@@ -56,6 +57,8 @@ if show_mode == 1:
     for dataset in test_datasets:
         # setup
         _, runtime_limit, _ = setup_exp(dataset, 1, 1, 1)
+        if args.runtime_limit is not None:
+            runtime_limit = args.runtime_limit
         for mth in mths:
             perfs = []
             dir_path = 'data/benchmark_xgb/%s-%d/%s/' % (dataset, runtime_limit, mth)
@@ -74,6 +77,8 @@ check_datasets(test_datasets)
 for dataset in test_datasets:
     # setup
     n_jobs, runtime_limit, _ = setup_exp(dataset, n_jobs, 1, 1)
+    if args.runtime_limit is not None:
+        runtime_limit = args.runtime_limit
     x_train, x_val, x_test, y_train, y_val, y_test = load_data(dataset)
     for mth in mths:
         print('===== start test %s %s: rep=%d, n_jobs=%d' % (mth, dataset, rep, n_jobs))
