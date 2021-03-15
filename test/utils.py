@@ -49,7 +49,7 @@ def setup_exp(_dataset, n_jobs, runtime_limit, time_limit_per_trial):
 def load_data(dataset, data_dir='datasets', **kwargs):
     if dataset.startswith('kuaishou'):
         from ks.ks_utils import load_ks_data
-        return load_ks_data(dataset, **kwargs)
+        return load_ks_data(dataset, data_dir=data_dir, **kwargs)
 
     if dataset == 'codrna':
         name = dataset + '.pkl'

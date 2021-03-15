@@ -124,6 +124,8 @@ class mqBaseFacade(object):
             global_time = time.time() - self.global_start_time
             self.trial_statistics.append((observation, global_time))
             self.logger.info('Master: Get the [%d] result, observation is %s.' % (result_num, str(observation)))
+            if self.runtime_limit is not None and time.time() - self.global_start_time > self.runtime_limit:
+                break
             if result_num == result_needed:
                 break
 

@@ -16,7 +16,6 @@ from sklearn.metrics import balanced_accuracy_score
 
 sys.path.append(".")
 sys.path.insert(0, "../lite-bo")    # for dependency
-from mq_hb.xgb_model import XGBoost
 from utils import load_data, setup_exp, check_datasets, seeds
 
 # default_datasets = 'mnist_784,higgs,covertype'
@@ -44,6 +43,7 @@ print(n_jobs, test_datasets)
 
 
 def test_func(config, x_train, x_test, y_train, y_test, seed):
+    from mq_hb.xgb_model import XGBoost
     conf_dict = config.get_dictionary()
     model = XGBoost(**conf_dict, n_jobs=n_jobs, seed=seed)
     model.fit(x_train, y_train)
@@ -69,7 +69,10 @@ if show_mode == 1:
                     perfs.append(perf)
             m = np.mean(perfs).item()
             s = np.std(perfs).item()
-            print(dataset, mth, perfs, u'%.4f\u00B1%.4f' % (m, s))
+            if dataset == 'kuaishou1':
+                print(dataset, mth, perfs, u'%.5f\u00B1%.5f' % (m, s))
+            else:
+                print(dataset, mth, perfs, u'%.4f\u00B1%.4f' % (m, s))
     exit()
 
 

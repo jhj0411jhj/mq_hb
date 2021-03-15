@@ -3,7 +3,7 @@ run benchmark_process_record.py first to get new_record file
 
 example cmdline:
 
-python test/benchmark_plot.py --datasets covtype,codrna --R 27
+python test/benchmark_plot.py --dataset covtype --R 27
 
 """
 import argparse
@@ -90,10 +90,10 @@ def plot_setup(_dataset):
         plt.ylim(-0.9793, -0.9753)
         plt.xlim(0, runtime_limit+10)
     elif _dataset == 'kuaishou1':
-        plt.ylim(-0.77157, -0.7711)
+        plt.ylim(-0.7717, -0.7709)
         plt.xlim(0, runtime_limit+1000)
     elif _dataset == 'kuaishou2':
-        plt.ylim(-0.632, -0.612)
+        plt.ylim(-0.636, -0.611)
         plt.xlim(0, runtime_limit+1000)
 
 
@@ -122,6 +122,7 @@ for mth in mths:
                 raw_recorder = pkl.load(f)
             recorder = []
             for record in raw_recorder:
+                # assert len(record['configuration'].get_dictionary()) == 9
                 if record.get('n_iteration') is not None and record['n_iteration'] < R:
                     if not mth.startswith('hyperband'):
                         print('error abandon record by n_iteration:', R, mth, record)
