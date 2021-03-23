@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 
 from utils import setup_exp, descending, create_plot_points
 
-default_mths = 'random-n1,random-n3,smac,hyperband-n1,hyperband-n3,bohb-n1,bohb-n3'
+default_mths = 'random-n1,random-n3,smac,hyperband-n1,hyperband-n3,bohb-n1,bohb-n3,mfes-n1,mfes-n3'
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', type=str)
@@ -54,11 +54,13 @@ def fetch_color_marker(m_list):
             fill_values(name, 0)
         elif name.startswith('bohb-n3'):
             fill_values(name, 4)
-        elif name.startswith('other'):
+        elif name.startswith('mfes-n1'):
+            fill_values(name, 8)
+        elif name.startswith('mfes-n3'):
             fill_values(name, 7)
         else:
             print('color not defined:', name)
-            fill_values(name, 8)
+            fill_values(name, 4)
     return color_dict, marker_dict
 
 
@@ -78,6 +80,10 @@ def get_mth_legend(mth):
         return 'BOHB-n1'
     elif mth == 'bohb-n3':
         return 'BOHB-n3'
+    elif mth == 'mfes-n1':
+        return 'MFES-n1'
+    elif mth == 'mfes-n3':
+        return 'MFES-n3'
     else:
         return mth
 

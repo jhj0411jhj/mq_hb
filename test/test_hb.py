@@ -15,12 +15,8 @@ sys.path.insert(0, '../lite-bo')    # for dependency
 from mq_hb.mq_hb import mqHyperband
 from mq_hb.mq_mf_worker import mqmfWorker
 
-try:
-    from litebo.config_space import ConfigurationSpace, Configuration, \
-        UniformFloatHyperparameter, UniformIntegerHyperparameter
-except ImportError as e:
-    from litebo.utils.config_space import ConfigurationSpace, Configuration, \
-        UniformFloatHyperparameter, UniformIntegerHyperparameter
+from litebo.utils.config_space import ConfigurationSpace, Configuration, \
+    UniformFloatHyperparameter, UniformIntegerHyperparameter
 
 
 parser = argparse.ArgumentParser()

@@ -20,7 +20,7 @@ from utils import load_data, setup_exp, check_datasets, seeds
 
 # default_datasets = 'mnist_784,higgs,covertype'
 default_datasets = 'covtype,codrna'
-default_mths = 'random-n1,random-n3,smac,hyperband-n1,hyperband-n3,bohb-n1,bohb-n3'
+default_mths = 'random-n1,random-n3,smac,hyperband-n1,hyperband-n3,bohb-n1,bohb-n3,mfes-n1,mfes-n3'
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--datasets', type=str, default=default_datasets)

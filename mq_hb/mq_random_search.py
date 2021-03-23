@@ -3,10 +3,7 @@ import time
 from mq_hb.mq_base_facade import mqBaseFacade
 from mq_hb.utils import sample_configurations
 
-try:
-    from litebo.config_space import ConfigurationSpace
-except ImportError as e:
-    from litebo.utils.config_space import ConfigurationSpace
+from litebo.utils.config_space import ConfigurationSpace
 
 
 class mqRandomSearch(mqBaseFacade):
@@ -20,11 +17,12 @@ class mqRandomSearch(mqBaseFacade):
                  restart_needed=True,
                  time_limit_per_trial=600,
                  ip='',
-                 port=13579, ):
+                 port=13579,
+                 authkey=b'abc',):
         max_queue_len = max(100, 3 * n_workers)  # conservative design
         super().__init__(objective_func, method_name=method_id,
                          restart_needed=restart_needed, time_limit_per_trial=time_limit_per_trial,
-                         max_queue_len=max_queue_len, ip=ip, port=port)
+                         max_queue_len=max_queue_len, ip=ip, port=port, authkey=authkey)
         self.seed = random_state
         self.config_space = config_space
         self.config_space.seed(self.seed)
@@ -40,7 +38,7 @@ class mqRandomSearch(mqBaseFacade):
 
     def run(self):
         try:
-            for iter in range(self.num_iter):
+            for iter in range(1, 1 + self.num_iter):
                 self.logger.info('-' * 50)
                 self.logger.info("Random Search algorithm: %d/%d iteration starts" % (iter, self.num_iter))
                 start_time = time.time()

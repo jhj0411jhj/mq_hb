@@ -3,10 +3,7 @@ import numpy as np
 from mq_hb.utils import sample_configurations, expand_configurations
 from mq_hb.mq_hb import mqHyperband
 
-try:
-    from litebo.config_space import ConfigurationSpace
-except ImportError as e:
-    from litebo.utils.config_space import ConfigurationSpace
+from litebo.utils.config_space import ConfigurationSpace
 from litebo.core.sync_batch_advisor import SyncBatchAdvisor, SUCCESS
 
 
@@ -14,6 +11,7 @@ class mqBOHB(mqHyperband):
     """ The implementation of BOHB.
         The paper can be found in https://arxiv.org/abs/1807.01774 .
     """
+
     def __init__(self, objective_func,
                  config_space: ConfigurationSpace,
                  R,
@@ -26,25 +24,30 @@ class mqBOHB(mqHyperband):
                  restart_needed=True,
                  time_limit_per_trial=600,
                  ip='',
-                 port=13579, ):
+                 port=13579,
+                 authkey=b'abc',):
         super().__init__(objective_func, config_space, R, eta=eta, num_iter=num_iter,
                          random_state=random_state, method_id=method_id,
                          restart_needed=restart_needed, time_limit_per_trial=time_limit_per_trial,
-                         ip=ip, port=port)
+                         ip=ip, port=port, authkey=authkey)
 
         self.rand_prob = rand_prob
         self.bo_init_num = bo_init_num
-        self.rng = np.random.RandomState(random_state)
-        self.config_advisor = SyncBatchAdvisor(self.config_space,
+        task_info = {'num_constraints': 0, 'num_objs': 1}
+        # using median_imputation batch_strategy implemented in LiteBO to generate BO suggestions
+        self.config_advisor = SyncBatchAdvisor(config_space, task_info,
                                                batch_size=None,
                                                batch_strategy='median_imputation',
-                                               surrogate_type='prf',
                                                initial_trials=self.bo_init_num,
                                                init_strategy='random_explore_first',
                                                optimization_strategy='bo',
-                                               task_id=None,
+                                               surrogate_type='prf',
+                                               acq_type='ei',
+                                               acq_optimizer_type='local_random',
+                                               task_id=self.method_name,
                                                output_dir=self.log_directory,
-                                               rng=self.rng)
+                                               random_state=random_state,
+                                               )
         self.config_advisor.optimizer.rand_prob = 0.0
 
     def choose_next(self, num_config):
@@ -52,10 +55,10 @@ class mqBOHB(mqHyperband):
         self.logger.info('Sample %d configs in choose_next. rand_prob is %f.' % (num_config, self.rand_prob))
 
         # get bo configs
-        # update batchsize each round. todo: random ratio is fixed?
+        # update batchsize each round. random ratio is fixed.
         self.config_advisor.batch_size = num_config - int(num_config * self.rand_prob)
         bo_configs = self.config_advisor.get_suggestions()
-        bo_configs = bo_configs[:num_config]    # may exceed num_config in initial random sampling
+        bo_configs = bo_configs[:num_config]  # may exceed num_config in initial random sampling
         self.logger.info('len bo configs = %d.' % len(bo_configs))
 
         # sample random configs
@@ -71,9 +74,10 @@ class mqBOHB(mqHyperband):
         self.incumbent_perfs.extend(val_losses)
         # update config advisor
         for config, perf in zip(T, val_losses):
-            observation = (config, perf, SUCCESS)
+            objs = [perf]
+            observation = (config, SUCCESS, None, objs)   # config, trial_state, constraints, objs
             self.config_advisor.update_observation(observation)
-            self.logger.info('update observation: %s' % str(observation))
+            self.logger.info('update observation: config=%s, perf=%f' % (str(config), perf))
         self.logger.info('%d observations updated. %d incumbent configs total.' % (len(T), len(self.incumbent_configs)))
 
     def update_incumbent_after_reduce(self, T, incumbent_loss):

@@ -1,11 +1,8 @@
 from typing import List
-try:
-    from litebo.config_space import Configuration, ConfigurationSpace
-except ImportError as e:
-    from litebo.utils.config_space import Configuration, ConfigurationSpace
+import numpy as np
+from litebo.utils.config_space import Configuration, ConfigurationSpace
 
 
-# TODO: escape the bug.
 def sample_configurations(configuration_space: ConfigurationSpace, num: int) -> List[Configuration]:
     result = []
     cnt = 0
@@ -27,3 +24,25 @@ def expand_configurations(configs: List[Configuration], configuration_space: Con
             configs.append(config)
             config_cnt += 1
     return configs
+
+
+def minmax_normalization(x):
+    min_value = min(x)
+    delta = max(x) - min(x)
+    if delta == 0:
+        return [1.0]*len(x)
+    return [(float(item)-min_value)/float(delta) for item in x]
+
+
+def std_normalization(x):
+    _mean = np.mean(x)
+    _std = np.std(x)
+    if _std == 0:
+        return np.array([0.]*len(x))
+    return (np.array(x) - _mean) / _std
+
+
+def norm2_normalization(x):
+    z = np.array(x)
+    normalized_z = z / np.linalg.norm(z)
+    return normalized_z

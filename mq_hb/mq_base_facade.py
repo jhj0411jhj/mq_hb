@@ -24,7 +24,8 @@ class mqBaseFacade(object):
                  time_limit_per_trial=600,
                  max_queue_len=300,
                  ip='',
-                 port=13579,):
+                 port=13579,
+                 authkey=b'abc',):
         self.log_directory = log_directory
         if not os.path.exists(self.log_directory):
             os.makedirs(self.log_directory)
@@ -58,7 +59,7 @@ class mqBaseFacade(object):
         self.time_limit_per_trial = time_limit_per_trial
 
         max_queue_len = max(300, max_queue_len)
-        self.master_messager = MasterMessager(ip, port, max_queue_len, max_queue_len)
+        self.master_messager = MasterMessager(ip, port, authkey, max_queue_len, max_queue_len)
 
     def set_restart(self):
         self.restart_needed = True

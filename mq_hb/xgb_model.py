@@ -1,10 +1,6 @@
 import numpy as np
-try:
-    from litebo.config_space import ConfigurationSpace
-    from litebo.config_space import UniformFloatHyperparameter, UniformIntegerHyperparameter, Constant
-except ImportError as e:
-    from litebo.utils.config_space import ConfigurationSpace
-    from litebo.utils.config_space import UniformFloatHyperparameter, UniformIntegerHyperparameter, Constant
+from litebo.utils.config_space import ConfigurationSpace
+from litebo.utils.config_space import UniformFloatHyperparameter, UniformIntegerHyperparameter, Constant
 
 
 class XGBoost:

@@ -10,9 +10,9 @@ class mqmfWorker(object):
     """
     message queue worker for multi-fidelity optimization
     """
-    def __init__(self, objective_function, ip="127.0.0.1", port=13579):
+    def __init__(self, objective_function, ip="127.0.0.1", port=13579, authkey=b'abc'):
         self.objective_function = objective_function
-        self.worker_messager = WorkerMessager(ip, port)
+        self.worker_messager = WorkerMessager(ip, port, authkey=authkey)
 
     def run(self):
         while True:
