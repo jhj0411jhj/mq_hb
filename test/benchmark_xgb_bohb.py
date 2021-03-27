@@ -120,8 +120,8 @@ def evaluate_parallel(method_id, n_workers, dataset, seed, ip, port):
                       num_iter=num_iter, random_state=seed,
                       method_id=method_id, restart_needed=True,
                       time_limit_per_trial=time_limit_per_trial,
+                      runtime_limit=runtime_limit,
                       ip='', port=port)
-        bohb.runtime_limit = runtime_limit  # set total runtime limit
         bohb.run()
         return_list.extend(bohb.recorder)  # send to return list
 

@@ -32,17 +32,19 @@ class mqMFES(mqBaseFacade):
                  rand_prob=0.3,
                  init_weight=None, update_enable=True,
                  weight_method='rank_loss_p_norm', fusion_method='idp',
-                 power_num=2,
+                 power_num=3,
                  random_state=1,
                  method_id='mqMFES',
                  restart_needed=True,
                  time_limit_per_trial=600,
+                 runtime_limit=None,
                  ip='',
                  port=13579,
                  authkey=b'abc',):
         max_queue_len = 3 * R  # conservative design
         super().__init__(objective_func, method_name=method_id,
                          restart_needed=restart_needed, time_limit_per_trial=time_limit_per_trial,
+                         runtime_limit=runtime_limit,
                          max_queue_len=max_queue_len, ip=ip, port=port, authkey=authkey)
         self.config_space = config_space
         self.R = R
@@ -66,8 +68,6 @@ class mqMFES(mqBaseFacade):
             init_weight = [0.]
             init_weight.extend([1. / self.s_max] * self.s_max)
         assert len(init_weight) == (self.s_max + 1)
-        if self.weight_method == 'equal_weight':
-            assert self.update_enable is False
         self.logger.info('Weight method & flag: %s-%s' % (self.weight_method, str(self.update_enable)))
         self.logger.info("Initial weight is: %s" % init_weight[:self.s_max + 1])
         types, bounds = get_types(config_space)
@@ -140,24 +140,24 @@ class mqMFES(mqBaseFacade):
                 # and keep best (n_configs / eta) configurations
 
                 n_configs = n * self.eta ** (-i)
-                n_iterations = r * self.eta ** (i)
+                n_iteration = r * self.eta ** (i)
 
-                n_iter = n_iterations
+                n_iter = n_iteration
                 if last_run_num is not None and not self.restart_needed:
                     n_iter -= last_run_num
-                last_run_num = n_iterations
+                last_run_num = n_iteration
 
                 self.logger.info("%s: %d configurations x %d iterations each" %
-                                 (self.method_name, int(n_configs), int(n_iterations)))
+                                 (self.method_name, int(n_configs), int(n_iteration)))
 
                 ret_val, early_stops = self.run_in_parallel(T, n_iter, extra_info)
                 val_losses = [item['loss'] for item in ret_val]
                 ref_list = [item['ref_id'] for item in ret_val]
 
-                self.target_x[int(n_iterations)].extend(T)
-                self.target_y[int(n_iterations)].extend(val_losses)
+                self.target_x[int(n_iteration)].extend(T)
+                self.target_y[int(n_iteration)].extend(val_losses)
 
-                if int(n_iterations) == self.R:
+                if int(n_iteration) == self.R:
                     self.incumbent_configs.extend(T)
                     self.incumbent_perfs.extend(val_losses)
                     # Update history container.
@@ -290,7 +290,7 @@ class mqMFES(mqBaseFacade):
 
         if len(test_y) >= 3:
             # Get previous weights
-            if self.weight_method in ['rank_loss_softmax', 'rank_loss_single', 'rank_loss_p_norm']:
+            if self.weight_method == 'rank_loss_p_norm':
                 preserving_order_p = list()
                 preserving_order_nums = list()
                 for i, r in enumerate(r_list):
@@ -320,19 +320,10 @@ class mqMFES(mqBaseFacade):
                             preserving_order_p.append(preorder_num / pair_num)
                             preserving_order_nums.append(preorder_num)
 
-                if self.weight_method == 'rank_loss_softmax':
-                    order_weight = np.array(np.sqrt(preserving_order_nums))
-                    trans_order_weight = order_weight - np.max(order_weight)
-                    # Softmax mapping.
-                    new_weights = np.exp(trans_order_weight) / sum(np.exp(trans_order_weight))
-                elif self.weight_method == 'rank_loss_p_norm':
-                    trans_order_weight = np.array(preserving_order_p)
-                    power_sum = np.sum(np.power(trans_order_weight, self.power_num))
-                    new_weights = np.power(trans_order_weight, self.power_num) / power_sum
-                else:
-                    _idx = np.argmax(np.array(preserving_order_nums))
-                    new_weights = [0.] * K
-                    new_weights[_idx] = 1.
+                trans_order_weight = np.array(preserving_order_p)
+                power_sum = np.sum(np.power(trans_order_weight, self.power_num))
+                new_weights = np.power(trans_order_weight, self.power_num) / power_sum
+
             elif self.weight_method == 'rank_loss_prob':
                 # For basic surrogate i=1:K-1.
                 mean_list, var_list = list(), list()
@@ -373,52 +364,6 @@ class mqMFES(mqBaseFacade):
                     max_id = np.argmax(order_preseving_nums)
                     min_probability_array[max_id] += 1
                 new_weights = np.array(min_probability_array) / sample_num
-
-            elif self.weight_method == 'opt_based':
-                mean_list, var_list = list(), list()
-                for i, r in enumerate(r_list):
-                    if i != K - 1:
-                        mean, var = self.weighted_surrogate.surrogate_container[r].predict(test_x)
-                        tmp_y = np.reshape(mean, -1)
-                        tmp_var = np.reshape(var, -1)
-                        mean_list.append(tmp_y)
-                        var_list.append(tmp_var)
-                    else:
-                        if len(test_y) < 8:
-                            mean_list.append(np.array([0] * len(test_y)))
-                            var_list.append(np.array([0] * len(test_y)))
-                        else:
-                            # 5-fold cross validation.
-                            kfold = KFold(n_splits=5)
-                            cv_pred = np.array([0] * len(test_y))
-                            cv_var = np.array([0] * len(test_y))
-                            for train_idx, valid_idx in kfold.split(test_x):
-                                train_configs, train_y = test_x[train_idx], test_y[train_idx]
-                                valid_configs, valid_y = test_x[valid_idx], test_y[valid_idx]
-                                types, bounds = get_types(self.config_space)
-                                _surrogate = RandomForestWithInstances(types=types, bounds=bounds)
-                                _surrogate.train(train_configs, train_y)
-                                pred, var = _surrogate.predict(valid_configs)
-                                cv_pred[valid_idx] = pred.reshape(-1)
-                                cv_var[valid_idx] = var.reshape(-1)
-                            mean_list.append(cv_pred)
-                            var_list.append(cv_var)
-                means = np.array(mean_list)
-                vars = np.array(var_list) + 1e-8
-
-                def min_func(x):
-                    x = np.reshape(np.array(x), (1, len(x)))
-                    ensemble_vars = 1 / (x @ (1 / vars))
-                    ensemble_means = x @ (means / vars) * ensemble_vars
-                    ensemble_means = np.reshape(ensemble_means, -1)
-                    self.logger.info("Loss:" + str(x))
-                    return mqMFES.calculate_ranking_loss(ensemble_means, test_y)
-
-                constraints = [{'type': 'eq', 'fun': lambda x: np.sum(x) - 1},
-                               {'type': 'ineq', 'fun': lambda x: x - 0},
-                               {'type': 'ineq', 'fun': lambda x: 1 - x}]
-                res = minimize(min_func, np.array([1e-8] * K), constraints=constraints)
-                new_weights = res.x
             else:
                 raise ValueError('Invalid weight method: %s!' % self.weight_method)
         else:

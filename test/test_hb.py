@@ -1,8 +1,8 @@
 """
 example cmdline:
 
-python test_hb.py --role master --ip '' --n_worker 1 --R 27
-python test_hb.py --role worker --ip 127.0.0.1 --n_worker 1 --R 27
+python test/test_hb.py --role master --ip '' --n_workers 1 --R 27
+python test/test_hb.py --role worker --ip 127.0.0.1 --n_workers 1 --R 27
 
 """
 
@@ -87,8 +87,9 @@ if role == 'master':
     hyperband = mqHyperband(None, cs, R, eta=eta,
                             num_iter=1, random_state=seed,
                             method_id=method_id, restart_needed=True,
-                            time_limit_per_trial=600, ip='', port=port)
-    hyperband.runtime_limit = None      # set total runtime limit
+                            time_limit_per_trial=600,
+                            runtime_limit=None,
+                            ip='', port=port)
     hyperband.run()
 else:
     worker = mqmfWorker(mf_objective_func, ip, port)

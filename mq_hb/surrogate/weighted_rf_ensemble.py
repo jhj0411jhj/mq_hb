@@ -86,21 +86,5 @@ class WeightedRandomForestCluster(AbstractModel):
                 means += self.surrogate_weight[r] * mean
                 vars += self.surrogate_weight[r] * self.surrogate_weight[r] * var
             return means.reshape((-1, 1)), vars.reshape((-1, 1))
-        elif self.fusion == 'gpoe':
-            n = X.shape[0]
-            m = len(self.surrogate_r)
-            var_buf = np.zeros((n, m))
-            mu_buf = np.zeros((n, m))
-            # Predictions from base surrogates.
-            for i, r in enumerate(self.surrogate_r):
-                mu_t, var_t = self.surrogate_container[r].predict(X)
-                mu_t = mu_t.flatten()
-                var_t = var_t.flatten() + 1e-8
-                # compute the gaussian experts.
-                var_buf[:, i] = 1. / var_t * self.surrogate_weight[r]
-                mu_buf[:, i] = 1. / var_t * mu_t * self.surrogate_weight[r]
-            var = 1. / np.sum(var_buf, axis=1)
-            mu = np.sum(mu_buf, axis=1) * var
-            return mu.reshape((-1, 1)), var.reshape((-1, 1))
         else:
-            raise ValueError('Undefined Fusion Method!')
+            raise ValueError('Undefined Fusion Method: %s!' % self.fusion)

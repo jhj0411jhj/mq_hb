@@ -88,8 +88,9 @@ if role == 'master':
     hyperband = mqHyperband(None, cs, R, eta=eta,
                             num_iter=num_iter, random_state=seed,
                             method_id=method_id, restart_needed=True,
-                            time_limit_per_trial=600, ip='', port=port)
-    hyperband.runtime_limit = runtime_limit     # set total runtime limit
+                            time_limit_per_trial=600,
+                            runtime_limit=runtime_limit,
+                            ip='', port=port)
     hyperband.run()
 else:
     x_train, x_val, x_test, y_train, y_val, y_test = load_data(dataset)

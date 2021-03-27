@@ -2,6 +2,10 @@ from typing import List
 import numpy as np
 from litebo.utils.config_space import Configuration, ConfigurationSpace
 
+RUNNING = 'running'
+COMPLETED = 'completed'
+PROMOTED = 'promoted'
+
 
 def sample_configurations(configuration_space: ConfigurationSpace, num: int) -> List[Configuration]:
     result = []
