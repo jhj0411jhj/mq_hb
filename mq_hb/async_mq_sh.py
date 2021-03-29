@@ -2,8 +2,8 @@ import time
 import numpy as np
 from math import log, ceil
 from mq_hb.async_mq_base_facade import async_mqBaseFacade
-from mq_hb.utils import sample_configurations
 from mq_hb.utils import RUNNING, COMPLETED, PROMOTED
+from mq_hb.utils import sample_configuration
 
 from litebo.utils.config_space import ConfigurationSpace
 from litebo.utils.constants import MAXINT
@@ -38,7 +38,6 @@ class async_mqSuccessiveHalving(async_mqBaseFacade):
         self.eta = eta  # Define configuration downsampling rate (default = 3)
         self.logeta = lambda x: log(x) / log(self.eta)
         self.s_max = int(self.logeta(self.R))
-        self.B = (self.s_max + 1) * self.R
 
         self.incumbent_configs = list()
         self.incumbent_perfs = list()
@@ -128,7 +127,7 @@ class async_mqSuccessiveHalving(async_mqBaseFacade):
             next_config, next_n_iteration, next_extra_conf = self.choose_next()
             # update bracket
             rung_id = self.get_rung_id(self.bracket, next_n_iteration)
-            self.logger.info('Sample a new config %s. Add to rung %d.' % (next_config, rung_id))
+            self.logger.info('Sample a new config: %s. Add to rung %d.' % (next_config, rung_id))
             new_job = [RUNNING, next_config, MAXINT, next_extra_conf]   # running perf is set to MAXINT
             self.bracket[rung_id]['jobs'].append(new_job)
             self.bracket[rung_id]['configs'].add(next_config)
@@ -152,7 +151,7 @@ class async_mqSuccessiveHalving(async_mqBaseFacade):
         assert updated
         # print('=== bracket after update_observation:', self.get_bracket_status(self.bracket))
 
-        if int(n_iteration) >= self.R:
+        if int(n_iteration) == self.R:
             self.incumbent_configs.append(config)
             self.incumbent_perfs.append(perf)
         return
@@ -161,16 +160,7 @@ class async_mqSuccessiveHalving(async_mqBaseFacade):
         """
         sample a random config and give the least iterations
         """
-        sample_cnt = 0
-        max_sample_cnt = 1000
-        while True:
-            next_config = self.config_space.sample_configuration()
-            sample_cnt += 1
-            if next_config not in self.bracket[0]['configs']:
-                break
-            if sample_cnt >= max_sample_cnt:
-                raise ValueError('Cannot sample non duplicate configuration after %d iterations.' % max_sample_cnt)
-
+        next_config = sample_configuration(self.config_space, excluded_configs=self.bracket[0]['configs'])
         next_n_iteration = self.bracket[0]['n_iteration']
         next_extra_conf = {}
         return next_config, next_n_iteration, next_extra_conf

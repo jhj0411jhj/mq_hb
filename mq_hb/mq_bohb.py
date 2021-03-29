@@ -1,10 +1,7 @@
-import numpy as np
-
-from mq_hb.utils import sample_configurations, expand_configurations
-from mq_hb.mq_hb import mqHyperband
-
 from litebo.utils.config_space import ConfigurationSpace
 from litebo.core.sync_batch_advisor import SyncBatchAdvisor, SUCCESS
+from mq_hb.mq_hb import mqHyperband
+from mq_hb.utils import sample_configurations, expand_configurations
 
 
 class mqBOHB(mqHyperband):

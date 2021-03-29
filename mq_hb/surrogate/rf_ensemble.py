@@ -3,7 +3,7 @@ from litebo.surrogate.base.base_model import AbstractModel
 from litebo.surrogate.base.rf_with_instances import RandomForestWithInstances
 
 
-class WeightedRandomForestCluster(AbstractModel):
+class RandomForestEnsemble(AbstractModel):
     def __init__(self, types: np.ndarray,
                  bounds: np.ndarray, s_max, eta, weight_list, fusion_method, **kwargs):
         super().__init__(types=types, bounds=bounds, **kwargs)
@@ -18,7 +18,7 @@ class WeightedRandomForestCluster(AbstractModel):
         for index, item in enumerate(np.logspace(0, self.s_max, self.s_max + 1, base=self.eta)):
             r = int(item)
             self.surrogate_r.append(r)
-            self.surrogate_weight[r] = self.weight_list[self.s_max - index]
+            self.surrogate_weight[r] = self.weight_list[index]
             self.surrogate_container[r] = RandomForestWithInstances(types=types, bounds=bounds)
 
     def train(self, X: np.ndarray, Y: np.ndarray, r) -> 'AbstractModel':

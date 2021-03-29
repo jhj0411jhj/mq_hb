@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 from utils import setup_exp, descending, create_plot_points
 
 default_mths = 'random-n1,random-n3,smac,hyperband-n1,hyperband-n3,bohb-n1,bohb-n3,mfes-n1,mfes-n3'
+#default_mths = 'random-n1,random-n3,smac,hyperband-n1,hyperband-n3,bohb-n1,bohb-n3,mfes-n1,mfes-n3,amfes-n1,amfes-n3'
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', type=str)
@@ -60,7 +61,7 @@ def fetch_color_marker(m_list):
             fill_values(name, 7)
         else:
             print('color not defined:', name)
-            fill_values(name, 4)
+            fill_values(name, 1)
     return color_dict, marker_dict
 
 
