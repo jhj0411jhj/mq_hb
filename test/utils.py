@@ -21,18 +21,14 @@ def setup_exp(_dataset, n_jobs, runtime_limit, time_limit_per_trial):
         n_jobs = 4
         runtime_limit = 12 * 3600           # 12h
         time_limit_per_trial = 3 * 3600     # 3h
-    elif _dataset == 'higgs':
+    elif _dataset == 'HIGGS':
         n_jobs = 4
-        runtime_limit = 2 * 3600            # 2h
-        time_limit_per_trial = 600          # 10min
+        runtime_limit = 12 * 3600           # 12h
+        time_limit_per_trial = 999999
     elif _dataset == 'covertype':
         n_jobs = 4
         runtime_limit = 5 * 3600            # 5h
         time_limit_per_trial = 1200         # 20min
-    elif _dataset == 'covtype':
-        n_jobs = 4
-        runtime_limit = 12 * 3600           # 12h
-        time_limit_per_trial = 2 * 3600     # 2h
     elif _dataset == 'codrna':
         n_jobs = 4
         runtime_limit = 3000                # 50min
@@ -69,7 +65,7 @@ def load_data(dataset, data_dir='datasets', **kwargs):
         y_train = np.load(os.path.join(data_dir, name_y_train))
         y_val = np.load(os.path.join(data_dir, name_y_val))
         y_test = np.load(os.path.join(data_dir, name_y_test))
-    print(dataset, 'loaded. n_instances =', x_train.shape[0], x_val.shape[0], x_test.shape[0])
+    print(dataset, 'loaded. x shape =', x_train.shape, x_val.shape, x_test.shape)
     return x_train, x_val, x_test, y_train, y_val, y_test
 
 

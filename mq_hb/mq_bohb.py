@@ -38,7 +38,7 @@ class mqBOHB(mqHyperband):
                                                batch_size=None,
                                                batch_strategy='median_imputation',
                                                initial_trials=self.bo_init_num,
-                                               init_strategy='random_explore_first',
+                                               init_strategy='random',
                                                optimization_strategy='bo',
                                                surrogate_type='prf',
                                                acq_type='ei',
@@ -54,10 +54,14 @@ class mqBOHB(mqHyperband):
         self.logger.info('Sample %d configs in choose_next. rand_prob is %f.' % (num_config, self.rand_prob))
 
         # get bo configs
-        # update batchsize each round. random ratio is fixed.
-        self.config_advisor.batch_size = num_config - int(num_config * self.rand_prob)
-        bo_configs = self.config_advisor.get_suggestions()
-        bo_configs = bo_configs[:num_config]  # may exceed num_config in initial random sampling
+        if len(self.incumbent_configs) < self.bo_init_num:
+            # fix bug: bo advisor suggests repeated configs if call get_suggestions() repeatedly in initial stage
+            bo_configs = list()
+        else:
+            # update batchsize each round. random ratio is fixed.
+            self.config_advisor.batch_size = num_config - int(num_config * self.rand_prob)
+            bo_configs = self.config_advisor.get_suggestions()
+            bo_configs = bo_configs[:num_config]  # may exceed num_config in initial random sampling
         self.logger.info('len bo configs = %d.' % len(bo_configs))
 
         # sample random configs

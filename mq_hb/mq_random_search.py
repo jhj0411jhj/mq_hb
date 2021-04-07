@@ -1,5 +1,6 @@
-import numpy as np
 import time
+import traceback
+import numpy as np
 from mq_hb.mq_base_facade import mqBaseFacade
 from mq_hb.utils import sample_configurations
 
@@ -47,10 +48,11 @@ class mqRandomSearch(mqBaseFacade):
                 self.iterate()
                 time_elapsed = (time.time() - start_time) / 60
                 self.logger.info("iteration took %.2f min." % time_elapsed)
-                self.save_intemediate_statistics()
+                self.save_intermediate_statistics()
         except Exception as e:
             print(e)
-            self.logger.error(str(e))
+            print(traceback.format_exc())
+            self.logger.error(traceback.format_exc())
             # clear the immediate result.
             # self.remove_immediate_model()
 

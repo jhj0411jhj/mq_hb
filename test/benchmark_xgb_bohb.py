@@ -17,8 +17,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import balanced_accuracy_score
 from multiprocessing import Process, Manager
 
-sys.path.append(".")
-sys.path.insert(0, "../lite-bo")    # for dependency
+sys.path.insert(0, ".")
+sys.path.insert(1, "../lite-bo")    # for dependency
 from mq_hb.mq_bohb import mqBOHB
 from mq_hb.mq_mf_worker import mqmfWorker
 from mq_hb.xgb_model import XGBoost
@@ -115,15 +115,15 @@ def evaluate_parallel(method_id, n_workers, dataset, seed, ip, port):
                                 x_train=x_train, x_val=x_val, y_train=y_train, y_val=y_val)
 
     def master_run(return_list):
-        bohb = mqBOHB(None, cs, R, eta=eta,
+        algo = mqBOHB(None, cs, R, eta=eta,
                       rand_prob=rand_prob, bo_init_num=init_num,
                       num_iter=num_iter, random_state=seed,
                       method_id=method_id, restart_needed=True,
                       time_limit_per_trial=time_limit_per_trial,
                       runtime_limit=runtime_limit,
                       ip='', port=port)
-        bohb.run()
-        return_list.extend(bohb.recorder)  # send to return list
+        algo.run()
+        return_list.extend(algo.recorder)  # send to return list
 
     def worker_run(i):
         worker = mqmfWorker(mf_objective_func, ip, port)

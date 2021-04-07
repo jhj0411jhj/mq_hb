@@ -1,5 +1,5 @@
 """
-test read saved data. see mqBaseFacade.save_intemediate_statistics()
+test read saved data. see mqBaseFacade.save_intermediate_statistics()
 """
 import os
 import numpy as np

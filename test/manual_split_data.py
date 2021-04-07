@@ -12,7 +12,7 @@ import argparse
 import numpy as np
 import pickle as pkl
 
-sys.path.append(".")
+sys.path.insert(0, ".")
 from ks.ks_utils import load_ks_df1, load_ks_df2
 
 parser = argparse.ArgumentParser()

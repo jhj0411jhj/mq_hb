@@ -1,7 +1,7 @@
 """
 example cmdline:
 
-python test/benchmark_xgb_mfes.py --datasets spambase --R 27 --n_jobs 4 --n_workers 1 --rand_prob 0.3 \
+python test/benchmark_xgb_sh.py --datasets spambase --R 27 --n_jobs 4 --n_workers 1 \
 --num_iter 10000 --runtime_limit 60 --rep 1 --start_id 0
 
 """
@@ -19,7 +19,7 @@ from multiprocessing import Process, Manager
 
 sys.path.insert(0, ".")
 sys.path.insert(1, "../lite-bo")    # for dependency
-from mq_hb.mq_mfes import mqMFES
+from mq_hb.mq_sh import mqSuccessiveHalving
 from mq_hb.mq_mf_worker import mqmfWorker
 from mq_hb.xgb_model import XGBoost
 from utils import load_data, setup_exp, check_datasets, seeds
@@ -32,8 +32,6 @@ parser.add_argument('--datasets', type=str, default=default_datasets)
 parser.add_argument('--R', type=int, default=27)
 parser.add_argument('--eta', type=int, default=3)
 parser.add_argument('--n_jobs', type=int, default=4)
-
-parser.add_argument('--rand_prob', type=float, default=0.3)
 
 parser.add_argument('--ip', type=str, default='127.0.0.1')
 parser.add_argument('--port', type=int, default=0)
@@ -52,8 +50,6 @@ print("datasets num=", len(test_datasets))
 R = args.R
 eta = args.eta
 n_jobs = args.n_jobs                                # changed according to dataset
-
-rand_prob = args.rand_prob
 
 ip = args.ip
 port = args.port
@@ -113,15 +109,14 @@ def evaluate_parallel(method_id, n_workers, dataset, seed, ip, port):
                                 x_train=x_train, x_val=x_val, y_train=y_train, y_val=y_val)
 
     def master_run(return_list):
-        mfes = mqMFES(None, cs, R, eta=eta,
-                      rand_prob=rand_prob,
-                      num_iter=num_iter, random_state=seed,
-                      method_id=method_id, restart_needed=True,
-                      time_limit_per_trial=time_limit_per_trial,
-                      runtime_limit=runtime_limit,
-                      ip='', port=port)
-        mfes.run()
-        return_list.extend(mfes.recorder)  # send to return list
+        algo = mqSuccessiveHalving(None, cs, R, eta=eta,
+                                   num_iter=num_iter, random_state=seed,
+                                   method_id=method_id, restart_needed=True,
+                                   time_limit_per_trial=time_limit_per_trial,
+                                   runtime_limit=runtime_limit,
+                                   ip='', port=port)
+        algo.run()
+        return_list.extend(algo.recorder)  # send to return list
 
     def worker_run(i):
         worker = mqmfWorker(mf_objective_func, ip, port)
@@ -157,7 +152,7 @@ for dataset in test_datasets:
         seed = seeds[i]
 
         timestamp = time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime(time.time()))
-        method_str = 'mfes-n%d' % (n_workers,)
+        method_str = 'sh-n%d' % (n_workers,)
         method_id = method_str + '-%s-%d-%s' % (dataset, seed, timestamp)
 
         recorder = evaluate_parallel(method_id, n_workers, dataset, seed, ip, port)

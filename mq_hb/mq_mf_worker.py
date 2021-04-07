@@ -6,13 +6,31 @@ from litebo.utils.limit import time_limit, TimeoutException
 from litebo.core.message_queue.worker_messager import WorkerMessager
 
 
+def no_time_limit_func(objective_function, time_limit_per_trial, args, kwargs):
+    ret = objective_function(*args, **kwargs)
+    return False, ret
+
+
 class mqmfWorker(object):
     """
     message queue worker for multi-fidelity optimization
     """
-    def __init__(self, objective_function, ip="127.0.0.1", port=13579, authkey=b'abc'):
+    def __init__(self, objective_function,
+                 ip="127.0.0.1", port=13579, authkey=b'abc',
+                 no_time_limit=False,
+                 logger=None):
         self.objective_function = objective_function
         self.worker_messager = WorkerMessager(ip, port, authkey=authkey)
+
+        if no_time_limit:
+            self.time_limit = no_time_limit_func
+        else:
+            self.time_limit = time_limit
+
+        if logger is not None:
+            self.logging = logger.info
+        else:
+            self.logging = print
 
     def run(self):
         while True:
@@ -20,13 +38,13 @@ class mqmfWorker(object):
             try:
                 msg = self.worker_messager.receive_message()
             except Exception as e:
-                print("Worker receive message error:", str(e))
+                self.logging("Worker receive message error: %s" % str(e))
                 return
             if msg is None:
                 # Wait for configs
                 time.sleep(1)
                 continue
-            print("Worker: get config. start working.")
+            self.logging("Worker: get msg: %s. start working." % msg)
             config, extra_conf, time_limit_per_trial, n_iteration, trial_id = msg
 
             # Start working
@@ -36,9 +54,9 @@ class mqmfWorker(object):
             early_stop = False
             try:
                 args, kwargs = (config, n_iteration, extra_conf), dict()
-                timeout_status, _result = time_limit(self.objective_function,
-                                                     time_limit_per_trial,
-                                                     args=args, kwargs=kwargs)
+                timeout_status, _result = self.time_limit(self.objective_function,
+                                                          time_limit_per_trial,
+                                                          args=args, kwargs=kwargs)
                 if timeout_status:
                     raise TimeoutException(
                         'Timeout: time limit for this evaluation is %.1fs' % time_limit_per_trial)
@@ -70,9 +88,9 @@ class mqmfWorker(object):
             observation = [return_info, time_taken, trial_id, config]
 
             # Send result
-            print("Worker: perf=%f. time=%d. sending result." % (perf, int(time_taken)))
+            self.logging("Worker: perf=%f. time=%.2fs. sending result." % (perf, time_taken))
             try:
                 self.worker_messager.send_message(observation)
             except Exception as e:
-                print("Worker send message error:", str(e))
+                self.logging("Worker send message error: %s" % str(e))
                 return

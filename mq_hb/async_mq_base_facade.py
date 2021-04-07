@@ -1,5 +1,6 @@
 import time
 import os
+import traceback
 import numpy as np
 import pickle as pkl
 from litebo.utils.logging_utils import get_logger, setup_logger
@@ -54,6 +55,10 @@ class async_mqBaseFacade(object):
         self.stage_id = 1
         self.stage_history = {'stage_id': list(), 'performance': list()}
         self.grid_search_perf = list()
+
+        self.save_intermediate_record = False
+        self.save_intermediate_record_id = 0
+        self.save_intermediate_record_path = None
 
         if self.method_name is None:
             raise ValueError('Method name must be specified! NOT NONE.')
@@ -114,6 +119,8 @@ class async_mqBaseFacade(object):
                     self.recorder.append({'trial_id': trial_id, 'time_consumed': time_taken,
                                           'configuration': config, 'n_iteration': n_iteration,
                                           'return_info': return_info, 'global_time': global_time})
+                    if (not hasattr(self, 'R')) or n_iteration == self.R:
+                        self.save_intermediate_statistics()
 
                 # Send new job
                 t = time.time()
@@ -126,13 +133,32 @@ class async_mqBaseFacade(object):
 
         except Exception as e:
             print(e)
-            self.logger.error(str(e))
+            print(traceback.format_exc())
+            self.logger.error(traceback.format_exc())
 
     def get_job(self):
         raise NotImplementedError
 
     def update_observation(self, config, perf, n_iteration):
         raise NotImplementedError
+
+    def set_save_intermediate_record(self, dir_path, file_name):
+        if not os.path.exists(dir_path):
+            os.makedirs(dir_path)
+        self.save_intermediate_record = True
+        if file_name.endswith('.pkl'):
+            file_name = file_name[:-4]
+        self.save_intermediate_record_path = os.path.join(dir_path, file_name)
+        self.logger.info('set save_intermediate_record to True. path: %s.' % (self.save_intermediate_record_path,))
+
+    def save_intermediate_statistics(self):
+        if self.save_intermediate_record:
+            self.save_intermediate_record_id += 1
+            path = '%s_%d.pkl' % (self.save_intermediate_record_path, self.save_intermediate_record_id)
+            with open(path, 'wb') as f:
+                pkl.dump(self.recorder, f)
+            global_time = time.time() - self.global_start_time
+            self.logger.info('Intermediate record %s saved! global_time=%.2fs.' % (path, global_time))
 
     def _get_logger(self, name):
         logger_name = name

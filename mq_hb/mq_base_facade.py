@@ -54,6 +54,10 @@ class mqBaseFacade(object):
         self.stage_history = {'stage_id': [], 'performance': []}
         self.grid_search_perf = []
 
+        self.save_intermediate_record = False
+        self.save_intermediate_record_id = 0
+        self.save_intermediate_record_path = None
+
         if self.method_name is None:
             raise ValueError('Method name must be specified! NOT NONE.')
 
@@ -128,7 +132,8 @@ class mqBaseFacade(object):
             result_num += 1
             global_time = time.time() - self.global_start_time
             self.trial_statistics.append((observation, global_time))
-            self.logger.info('Master: Get the [%d] result, observation is %s.' % (result_num, str(observation)))
+            self.logger.info('Master: Get the [%d] observation %s. Global time=%.2fs.'
+                             % (result_num, str(observation), global_time))
             if result_num == result_needed:
                 break
 
@@ -155,12 +160,29 @@ class mqBaseFacade(object):
 
         self.trial_statistics.clear()
 
-        self.save_intemediate_statistics()
+        self.save_intermediate_statistics()
         if self.runtime_limit is not None and time.time() - self.global_start_time > self.runtime_limit:
             raise ValueError('Runtime budget meets!')
         return performance_result, early_stops
 
-    def save_intemediate_statistics(self, save_stage=False):
+    def set_save_intermediate_record(self, dir_path, file_name):
+        if not os.path.exists(dir_path):
+            os.makedirs(dir_path)
+        self.save_intermediate_record = True
+        if file_name.endswith('.pkl'):
+            file_name = file_name[:-4]
+        self.save_intermediate_record_path = os.path.join(dir_path, file_name)
+        self.logger.info('set save_intermediate_record to True. path: %s.' % (self.save_intermediate_record_path,))
+
+    def save_intermediate_statistics(self, save_stage=False):
+        if self.save_intermediate_record:
+            self.save_intermediate_record_id += 1
+            path = '%s_%d.pkl' % (self.save_intermediate_record_path, self.save_intermediate_record_id)
+            with open(path, 'wb') as f:
+                pkl.dump(self.recorder, f)
+            global_time = time.time() - self.global_start_time
+            self.logger.info('Intermediate record %s saved! global_time=%.2fs.' % (path, global_time))
+
         # file_name = '%s.npy' % self.method_name
         # x = np.array(self._history['time_elapsed'])
         # y = np.array(self._history['performance'])

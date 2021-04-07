@@ -14,8 +14,11 @@ import matplotlib.pyplot as plt
 
 from utils import setup_exp, descending, create_plot_points
 
-default_mths = 'random-n1,random-n3,smac,hyperband-n1,hyperband-n3,bohb-n1,bohb-n3,mfes-n1,mfes-n3'
-#default_mths = 'random-n1,random-n3,smac,hyperband-n1,hyperband-n3,bohb-n1,bohb-n3,mfes-n1,mfes-n3,amfes-n1,amfes-n3'
+#default_mths = 'random-n1,random-n3,smac,hyperband-n1,hyperband-n3,bohb-n1,bohb-n3,mfes-n1,mfes-n3'
+# default_mths = 'random-n1,random-n3,smac,hyperband-n1,hyperband-n3,bohb-n1,bohb-n3,mfes-n1,mfes-n3,' \
+#                'amfes-n1,amfes-n3,mfesv2-n1,mfesv2-n3'
+default_mths = 'bohb-n1,bohb-n3,mfes-n1,mfes-n3,amfes-n1,amfes-n3,mfesv2-n1,mfesv2-n3,amfes-n1-old2,amfes-n3-old2'
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', type=str)
@@ -59,6 +62,14 @@ def fetch_color_marker(m_list):
             fill_values(name, 8)
         elif name.startswith('mfes-n3'):
             fill_values(name, 7)
+        elif name.startswith('amfes-n1'):
+            fill_values(name, 2)
+        elif name.startswith('amfes-n3'):
+            fill_values(name, 1)
+        elif name.startswith('mfesv2-n1'):
+            fill_values(name, 3)
+        elif name.startswith('mfesv2-n3'):
+            fill_values(name, 5)
         else:
             print('color not defined:', name)
             fill_values(name, 1)
@@ -91,7 +102,7 @@ def get_mth_legend(mth):
 
 def plot_setup(_dataset):
     if _dataset == 'covtype':
-        plt.ylim(-0.93, -0.87)
+        plt.ylim(-0.935, -0.875)
         plt.xlim(0, runtime_limit+200)
     elif _dataset == 'codrna':
         plt.ylim(-0.9793, -0.9753)
@@ -123,6 +134,10 @@ result = dict()
 for mth in mths:
     stats = []
     dir_path = 'data/benchmark_%s/%s-%d/%s/' % (model, dataset, runtime_limit, mth)
+    if mth.startswith('amfes') and mth.endswith('-old2'):   # todo
+        mth_dir = mth[:]
+        mth = mth[:-5]
+        dir_path = 'data/benchmark_%s/%s-%d/%s/' % (model, dataset, runtime_limit, mth_dir)
     for file in os.listdir(dir_path):
         if file.startswith('new_record_%s-%s-' % (mth, dataset)) and file.endswith('.pkl'):
             with open(os.path.join(dir_path, file), 'rb') as f:
@@ -155,7 +170,7 @@ for mth in mths:
     #plt.fill_between(x, m - s * std_scale, m + s * std_scale, alpha=alpha, facecolor=color_dict[mth])
 
 # calculate speedup
-speedup_algo = 1
+speedup_algo = 2
 print('===== mth - baseline - speedup ===== speedup_algo =', speedup_algo)
 for mth in mths:
     for baseline in mths:
@@ -179,7 +194,7 @@ for mth in mths:
                 mth_time = xi
                 break
         speedup = baseline_time / mth_time
-        print(mth, baseline, speedup)
+        print("%s %s %.2f" % (mth, baseline, speedup))
 
 # show plot
 plt.legend(loc='upper right')

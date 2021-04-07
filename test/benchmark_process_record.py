@@ -66,7 +66,7 @@ for mth in mths:
             for record in raw_recorder:
                 if record.get('n_iteration') is not None:
                     if record['n_iteration'] < R:
-                        if not mth.startswith('hyperband'):
+                        if mth.startswith('random') or mth == 'smac':
                             print('error abandon record by n_iteration:', R, mth, record)
                         continue
                     if record['n_iteration'] > R:

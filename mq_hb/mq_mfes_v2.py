@@ -1,13 +1,14 @@
 import time
 import os
-import numpy as np
+import copy
 import traceback
+import numpy as np
 from math import log, ceil
 from sklearn.model_selection import KFold
 from scipy.optimize import minimize
 
 from mq_hb.mq_base_facade import mqBaseFacade
-from mq_hb.utils import sample_configurations, expand_configurations
+from mq_hb.utils import sample_configurations, expand_configurations, sample_configuration
 from mq_hb.utils import minmax_normalization, std_normalization
 from mq_hb.surrogate.rf_ensemble import RandomForestEnsemble
 
@@ -21,9 +22,10 @@ from litebo.utils.config_space.util import convert_configurations_to_array
 from litebo.utils.history_container import HistoryContainer
 
 
-class mqMFES(mqBaseFacade):
+class mqMFES_v2(mqBaseFacade):
     """
     MFES-HB: https://arxiv.org/abs/2012.03011
+    with median_imputation
     """
     def __init__(self, objective_func,
                  config_space: ConfigurationSpace,
@@ -110,7 +112,7 @@ class mqMFES(mqBaseFacade):
             n_sls_iterations=self.n_sls_iterations,
             rand_prob=0.0,
         )
-        self.random_configuration_chooser = ChooserProb(prob=rand_prob, rng=self.rng)
+        self.rand_prob = rand_prob
 
     def iterate(self, skip_last=0):
 
@@ -185,11 +187,11 @@ class mqMFES(mqBaseFacade):
                 self.stage_id += 1
             # self.remove_immediate_model()
 
-            for item in self.iterate_r[self.iterate_r.index(r):]:
-                # NORMALIZE Objective value: normalization
-                normalized_y = std_normalization(self.target_y[item])
-                self.weighted_surrogate.train(convert_configurations_to_array(self.target_x[item]),
-                                              np.array(normalized_y, dtype=np.float64), r=item)
+            # for item in self.iterate_r[self.iterate_r.index(r):]:
+            #     # NORMALIZE Objective value: normalization
+            #     normalized_y = std_normalization(self.target_y[item])
+            #     self.weighted_surrogate.train(convert_configurations_to_array(self.target_x[item]),
+            #                                   np.array(normalized_y, dtype=np.float64), r=item)
 
     def run(self, skip_last=0):
         try:
@@ -210,17 +212,48 @@ class mqMFES(mqBaseFacade):
             # self.remove_immediate_model()
 
     def get_bo_candidates(self, num_configs):
-        # todo: parallel methods
+        """
+        use median imputation
+        """
+        candidate_configs = list()
+        excluded_configs = self.configs.copy()
         std_incumbent_value = np.min(std_normalization(self.target_y[self.iterate_r[-1]]))
-        # Update surrogate model in acquisition function.
-        self.acquisition_function.update(model=self.weighted_surrogate, eta=std_incumbent_value,
-                                         num_data=len(self.history_container.data))
+        batch_history_container = copy.deepcopy(self.history_container)
+        # compute median target values of each level
+        median_values = [np.median(self.target_y[r]) for r in self.iterate_r]
 
-        challengers = self.acq_optimizer.maximize(
-            runhistory=self.history_container,
-            num_points=5000,
-        )
-        return challengers.challengers[:num_configs]
+        for i in range(num_configs):
+            # Caution: cannot copy.deepcopy(self.weighted_surrogate): can't pickle SwigPyObject objects
+            # Refit the ensemble surrogate model.
+            for idx, r in enumerate(self.iterate_r):
+                configs_train = self.target_x[r] + candidate_configs
+                results_train = self.target_y[r] + [median_values[idx]] * len(candidate_configs)
+                # NORMALIZE Objective value: normalization
+                results_train = np.array(std_normalization(results_train), dtype=np.float64)
+                self.weighted_surrogate.train(convert_configurations_to_array(configs_train), results_train, r=r)
+
+            # Update surrogate model in acquisition function. The weighted surrogate is trained in the beginning.
+            self.acquisition_function.update(model=self.weighted_surrogate, eta=std_incumbent_value,
+                                             num_data=len(batch_history_container.data))
+            challengers = self.acq_optimizer.maximize(
+                runhistory=self.history_container,
+                num_points=5000,
+            )
+            curr_batch_config = None
+            for config in challengers.challengers:
+                if config not in excluded_configs:
+                    curr_batch_config = config
+                    break
+            if curr_batch_config is None:
+                self.logger.warning('Cannot get a non duplicate configuration from bo candidates. '
+                                    'Sample a random one.')
+                curr_batch_config = sample_configuration(self.config_space, excluded_configs=excluded_configs)
+
+            candidate_configs.append(curr_batch_config)
+            excluded_configs.append(curr_batch_config)
+            batch_history_container.add(curr_batch_config, median_values[-1])
+
+        return candidate_configs
 
     def choose_next(self, num_config):
         if len(self.target_y[self.iterate_r[-1]]) == 0:
@@ -228,30 +261,17 @@ class mqMFES(mqBaseFacade):
             self.configs.extend(configs)
             return configs
 
-        config_candidates = list()
-        acq_configs = self.get_bo_candidates(num_configs=2 * num_config)
-        acq_idx = 0
-        for idx in range(1, 1 + 2 * num_config):
-            # Like BOHB, sample a fixed percentage of random configurations.
-            if self.random_configuration_chooser.check(idx):
-                _config = self.config_space.sample_configuration()
-            else:
-                _config = acq_configs[acq_idx]
-                acq_idx += 1
-            if _config not in config_candidates:
-                config_candidates.append(_config)
-            if len(config_candidates) >= num_config:
-                break
+        # get bo configs. random ratio is fixed.
+        num_bo_config = num_config - int(num_config * self.rand_prob)
+        bo_configs = self.get_bo_candidates(num_configs=num_bo_config)
+        self.logger.info('len bo configs = %d.' % len(bo_configs))
 
-        if len(config_candidates) < num_config:
-            config_candidates = expand_configurations(config_candidates, self.config_space, num_config)
-
-        _config_candidates = []
-        for config in config_candidates:
-            if config not in self.configs:  # Check if evaluated
-                _config_candidates.append(config)
-        self.configs.extend(_config_candidates)
-        return _config_candidates
+        # sample random configs
+        configs = expand_configurations(bo_configs, self.config_space, num_config, excluded_configs=self.configs)
+        self.logger.info('len total configs = %d.' % len(configs))
+        assert len(configs) == num_config
+        self.configs.extend(configs)
+        return configs
 
     @staticmethod
     def calculate_preserving_order_num(y_pred, y_true):

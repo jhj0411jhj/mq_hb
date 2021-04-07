@@ -33,6 +33,7 @@ class async_mqMFES(async_mqHyperband):
                  skip_outer_loop=0,
                  rand_prob=0.3,
                  use_bohb=False,
+                 use_weight_bracket=False,
                  init_weight=None, update_enable=True,
                  weight_method='rank_loss_p_norm',
                  fusion_method='idp',
@@ -50,6 +51,8 @@ class async_mqMFES(async_mqHyperband):
                          time_limit_per_trial=time_limit_per_trial, runtime_limit=runtime_limit,
                          ip=ip, port=port, authkey=authkey)
         self.use_bohb_strategy = use_bohb
+        self.use_weight_bracket = use_weight_bracket
+
         self.update_enable = update_enable
         self.fusion_method = fusion_method
         # Parameter for weight method `rank_loss_p_norm`.
@@ -118,13 +121,14 @@ class async_mqMFES(async_mqHyperband):
         assert updated
         # print('=== bracket after update_observation:', self.get_bracket_status(self.bracket))
 
+        n_iteration = int(n_iteration)
+
         configs_running = list()
         for _config in self.bracket[rung_id]['configs']:
             if _config not in self.target_x[n_iteration]:
                 configs_running.append(_config)
         value_imputed = np.median(self.target_y[n_iteration])
 
-        n_iteration = int(n_iteration)
         self.target_x[n_iteration].append(config)
         self.target_y[n_iteration].append(perf)
 
@@ -179,6 +183,11 @@ class async_mqMFES(async_mqHyperband):
         """
         update: update weight and choose next bracket according to weights
         """
+        def choose_next_bracket():
+            self.hb_bracket_id += 1
+            if self.hb_bracket_id == len(self.hb_bracket_list):
+                self.hb_bracket_id = 0
+
         next_n_iteration = self.hb_iter_list[self.hb_iter_id]
         self.hb_iter_id += 1
         # next bracket
@@ -191,11 +200,12 @@ class async_mqMFES(async_mqHyperband):
                     self.update_enable and self.weight_update_id > self.s_max - self.skip_outer_loop:
                 self.update_weight()
                 new_weights = self.hist_weights[-1]     # caution the order of weights
-                self.hb_bracket_id = self.rng.choice(range(len(self.hb_bracket_list)), p=new_weights)
+                if self.use_weight_bracket:
+                    self.hb_bracket_id = self.rng.choice(range(len(self.hb_bracket_list)), p=new_weights)
+                else:
+                    choose_next_bracket()
             else:
-                self.hb_bracket_id += 1
-                if self.hb_bracket_id == len(self.hb_bracket_list):
-                    self.hb_bracket_id = 0
+                choose_next_bracket()
 
             self.hb_iter_list = self.hb_bracket_list[self.hb_bracket_id]
             self.logger.info('iteration list of next bracket: %s' % self.hb_iter_list)

@@ -17,8 +17,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import balanced_accuracy_score
 from multiprocessing import Process, Manager
 
-sys.path.append(".")
-sys.path.insert(0, "../lite-bo")    # for dependency
+sys.path.insert(0, ".")
+sys.path.insert(1, "../lite-bo")    # for dependency
 from mq_hb.mq_hb import mqHyperband
 from mq_hb.mq_mf_worker import mqmfWorker
 from mq_hb.xgb_model import XGBoost

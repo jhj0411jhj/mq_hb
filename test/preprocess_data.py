@@ -1,24 +1,87 @@
 import os
 import numpy as np
+import pandas as pd
 import pickle as pkl
 from sklearn.model_selection import train_test_split
 
-import sys
-sys.path.append('../soln-ml/')
-from solnml.datasets.utils import load_data
-from solnml.components.utils.constants import MULTICLASS_CLS
 
-data_dir = '../soln-ml/'
-# datasets = ['mnist_784', 'higgs', 'covertype', 'spambase', 'covtype', ]
-datasets = ['codrna', ]
+def load_dataset(dataset, data_dir):
+    """
+    no label encoding
+    """
+    data_path = os.path.join(data_dir, "%s.csv" % dataset)
+
+    # Load train data.
+    if dataset in ['higgs', 'amazon_employee', 'spectf', 'usps', 'vehicle_sensIT', 'codrna', 'HIGGS']:
+        label_col = 0
+    elif dataset in ['rmftsa_sleepdata(1)']:
+        label_col = 1
+    else:
+        label_col = -1
+
+    if dataset in ['spambase', 'messidor_features', 'covtype', 'HIGGS']:
+        header = None
+    else:
+        header = 'infer'
+
+    if dataset in ['winequality_white', 'winequality_red']:
+        sep = ';'
+    else:
+        sep = ','
+
+    na_values = ["n/a", "na", "--", "-", "?"]
+    keep_default_na = True
+    df = pd.read_csv(data_path, keep_default_na=keep_default_na,
+                     na_values=na_values, header=header, sep=sep)
+
+    # Drop the row with all NaNs.
+    df.dropna(how='all')
+
+    # Clean the data where the label columns have nans.
+    columns_missed = df.columns[df.isnull().any()].tolist()
+
+    label_colname = df.columns[label_col]
+
+    if label_colname in columns_missed:
+        labels = df[label_colname].values
+        row_idx = [idx for idx, val in enumerate(labels) if np.isnan(val)]
+        # Delete the row with NaN label.
+        df.drop(df.index[row_idx], inplace=True)
+
+    train_y = df[label_colname].values
+
+    # Delete the label column.
+    df.drop(label_colname, axis=1, inplace=True)
+
+    train_X = df
+    return train_X, train_y
+
+
+use_solnml = False
+
+if use_solnml:
+    import sys
+    sys.path.append('../soln-ml/')
+    from solnml.datasets.utils import load_data
+    from solnml.components.utils.constants import MULTICLASS_CLS
+    data_dir = '../soln-ml/'
+else:
+    data_dir = './datasets'
+
+
+# datasets = ['covtype', 'codrna']
+datasets = ['HIGGS', ]
 
 new_data_dir = 'datasets'
 if not os.path.exists(new_data_dir):
     os.makedirs(new_data_dir)
 
 for dataset in datasets:
-    x, y, feature_type = load_data(dataset, data_dir, False, task_type=MULTICLASS_CLS)
-    print(dataset, 'loaded', x.shape[0])
+    if use_solnml:
+        x, y, feature_type = load_data(dataset, data_dir, datanode_returned=False, task_type=MULTICLASS_CLS)
+    else:
+        x, y = load_dataset(dataset, data_dir)
+    print(dataset, 'loaded', x.shape, y.shape)
 
     # split. train : validate : test = 6 : 2 : 2
     xx, x_test, yy, y_test = train_test_split(x, y, test_size=0.2, stratify=y, random_state=1)
