@@ -15,9 +15,9 @@ import matplotlib.pyplot as plt
 from utils import setup_exp, descending, create_plot_points
 
 #default_mths = 'random-n1,random-n3,smac,hyperband-n1,hyperband-n3,bohb-n1,bohb-n3,mfes-n1,mfes-n3'
-# default_mths = 'random-n1,random-n3,smac,hyperband-n1,hyperband-n3,bohb-n1,bohb-n3,mfes-n1,mfes-n3,' \
-#                'amfes-n1,amfes-n3,mfesv2-n1,mfesv2-n3'
-default_mths = 'bohb-n1,bohb-n3,mfes-n1,mfes-n3,amfes-n1,amfes-n3,mfesv2-n1,mfesv2-n3,amfes-n1-old2,amfes-n3-old2'
+default_mths = 'random-n1,random-n3,smac,hyperband-n1,hyperband-n3,bohb-n1,bohb-n3,mfes-n1,mfes-n3,' \
+               'amfes-n1,amfes-n3,mfesv2-n1,mfesv2-n3'
+#default_mths = 'bohb-n1,bohb-n3,mfes-n1,mfes-n3,amfes-n1,amfes-n3,mfesv2-n1,mfesv2-n3,amfes-n1-old2,amfes-n3-old2'
 
 
 parser = argparse.ArgumentParser()
@@ -70,6 +70,10 @@ def fetch_color_marker(m_list):
             fill_values(name, 3)
         elif name.startswith('mfesv2-n3'):
             fill_values(name, 5)
+        elif name.startswith('mfesv3-n1'):
+            fill_values(name, 2)
+        elif name.startswith('mfesv3-n3'):
+            fill_values(name, 1)
         else:
             print('color not defined:', name)
             fill_values(name, 1)

@@ -238,20 +238,16 @@ class mqMFES(mqBaseFacade):
             else:
                 _config = acq_configs[acq_idx]
                 acq_idx += 1
-            if _config not in config_candidates:
+            if _config not in config_candidates and _config not in self.configs:
                 config_candidates.append(_config)
             if len(config_candidates) >= num_config:
                 break
 
-        if len(config_candidates) < num_config:
-            config_candidates = expand_configurations(config_candidates, self.config_space, num_config)
-
-        _config_candidates = []
-        for config in config_candidates:
-            if config not in self.configs:  # Check if evaluated
-                _config_candidates.append(config)
-        self.configs.extend(_config_candidates)
-        return _config_candidates
+        config_candidates = expand_configurations(config_candidates, self.config_space, num_config,
+                                                  excluded_configs=self.configs)
+        assert len(config_candidates) == num_config
+        self.configs.extend(config_candidates)
+        return config_candidates
 
     @staticmethod
     def calculate_preserving_order_num(y_pred, y_true):

@@ -26,7 +26,8 @@ class mqBaseFacade(object):
                  max_queue_len=300,
                  ip='',
                  port=13579,
-                 authkey=b'abc',):
+                 authkey=b'abc',
+                 sleep_time=0.1,):
         self.log_directory = log_directory
         if not os.path.exists(self.log_directory):
             os.makedirs(self.log_directory)
@@ -66,6 +67,7 @@ class mqBaseFacade(object):
 
         max_queue_len = max(300, max_queue_len)
         self.master_messager = MasterMessager(ip, port, authkey, max_queue_len, max_queue_len)
+        self.sleep_time = sleep_time
 
     def set_restart(self):
         self.restart_needed = True
@@ -125,8 +127,7 @@ class mqBaseFacade(object):
             observation = self.master_messager.receive_message()    # return_info, time_taken, trial_id, config
             if observation is None:
                 # Wait for workers.
-                # self.logger.info("Master: wait for worker results. sleep 1s.")
-                time.sleep(1)
+                time.sleep(self.sleep_time)
                 continue
             # Report result.
             result_num += 1

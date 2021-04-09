@@ -17,10 +17,12 @@ class mqmfWorker(object):
     """
     def __init__(self, objective_function,
                  ip="127.0.0.1", port=13579, authkey=b'abc',
+                 sleep_time=0.1,
                  no_time_limit=False,
                  logger=None):
         self.objective_function = objective_function
         self.worker_messager = WorkerMessager(ip, port, authkey=authkey)
+        self.sleep_time = sleep_time
 
         if no_time_limit:
             self.time_limit = no_time_limit_func
@@ -42,7 +44,7 @@ class mqmfWorker(object):
                 return
             if msg is None:
                 # Wait for configs
-                time.sleep(1)
+                time.sleep(self.sleep_time)
                 continue
             self.logging("Worker: get msg: %s. start working." % msg)
             config, extra_conf, time_limit_per_trial, n_iteration, trial_id = msg

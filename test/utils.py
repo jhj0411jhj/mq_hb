@@ -21,18 +21,26 @@ def setup_exp(_dataset, n_jobs, runtime_limit, time_limit_per_trial):
         n_jobs = 4
         runtime_limit = 12 * 3600           # 12h
         time_limit_per_trial = 3 * 3600     # 3h
+    elif _dataset == 'higgs':
+        n_jobs = 4
+        runtime_limit = 2 * 3600            # 2h
+        time_limit_per_trial = 600          # 10min
     elif _dataset == 'HIGGS':
+        n_jobs = 8
+        runtime_limit = 24 * 3600           # 24h
+        time_limit_per_trial = 999999
+    elif _dataset == 'covtype':
         n_jobs = 4
         runtime_limit = 12 * 3600           # 12h
-        time_limit_per_trial = 999999
-    elif _dataset == 'covertype':
-        n_jobs = 4
-        runtime_limit = 5 * 3600            # 5h
-        time_limit_per_trial = 1200         # 20min
+        time_limit_per_trial = 2 * 3600     # 2h
     elif _dataset == 'codrna':
         n_jobs = 4
         runtime_limit = 3000                # 50min
         time_limit_per_trial = 1200         # 20min
+    elif _dataset == 'a9a':
+        n_jobs = 1
+        runtime_limit = 3600                # 1h
+        time_limit_per_trial = 600          # 10min
     else:
         print('[setup exp] dataset setup not found. use input settings.')
     print('[setup exp] dataset=%s, n_jobs=%d, runtime_limit=%d, time_limit_per_trial=%d'
