@@ -1,5 +1,5 @@
-import time
 import sys
+import time
 import traceback
 from litebo.utils.constants import MAXINT, SUCCESS, FAILED, TIMEOUT
 from litebo.utils.limit import time_limit, TimeoutException
@@ -54,6 +54,7 @@ class mqmfWorker(object):
             trial_state = SUCCESS
             ref_id = None
             early_stop = False
+            test_perf = None
             try:
                 args, kwargs = (config, n_iteration, extra_conf), dict()
                 timeout_status, _result = self.time_limit(self.objective_function,
@@ -71,6 +72,7 @@ class mqmfWorker(object):
                             perf = MAXINT
                         ref_id = _result.get('ref_id', None)
                         early_stop = _result.get('early_stop', False)
+                        test_perf = _result.get('test_perf', None)
                     else:
                         perf = _result
             except Exception as e:
@@ -86,7 +88,8 @@ class mqmfWorker(object):
                                n_iteration=n_iteration,
                                ref_id=ref_id,
                                early_stop=early_stop,
-                               trial_state=trial_state)
+                               trial_state=trial_state,
+                               test_perf=test_perf)
             observation = [return_info, time_taken, trial_id, config]
 
             # Send result

@@ -21,9 +21,9 @@ from litebo.utils.config_space.util import convert_configurations_to_array
 from litebo.utils.history_container import HistoryContainer
 
 
-class async_mqMFES(async_mqHyperband):
+class async_mqWeightHyperband(async_mqHyperband):   # todo: remove redundant code
     """
-    The implementation of Asynchronous MFES (combine ASHA and MFES)
+    The implementation of Asynchronous Hyperband with bracket chosen according to MFES weight
     """
 
     def __init__(self, objective_func,
@@ -39,7 +39,7 @@ class async_mqMFES(async_mqHyperband):
                  fusion_method='idp',
                  power_num=3,
                  random_state=1,
-                 method_id='mqAsyncMFES',
+                 method_id='mqAsyncWeightHyperband',
                  restart_needed=True,
                  time_limit_per_trial=600,
                  runtime_limit=None,
@@ -78,6 +78,7 @@ class async_mqMFES(async_mqHyperband):
         self.iterate_id = 0
         self.iterate_r = list()
         self.hist_weights = list()
+        self.new_weights = None
 
         # Saving evaluation statistics in Hyperband.
         self.target_x = dict()
@@ -141,48 +142,19 @@ class async_mqMFES(async_mqHyperband):
             # todo: fix: update weight. len>=5 ?
             if not self.use_bohb_strategy and self.update_enable and len(self.incumbent_configs) >= 5:
                 self.update_weight()
-                new_weights = self.hist_weights[-1]  # caution the order of weights
+                self.new_weights = self.hist_weights[-1]  # caution the order of weights
 
         # Refit the ensemble surrogate model.
-        configs_train = self.target_x[n_iteration] + configs_running
-        results_train = self.target_y[n_iteration] + [value_imputed] * len(configs_running)
+        # configs_train = self.target_x[n_iteration] + configs_running
+        # results_train = self.target_y[n_iteration] + [value_imputed] * len(configs_running)
+        configs_train = self.target_x[n_iteration]
+        results_train = self.target_y[n_iteration]
         results_train = np.array(std_normalization(results_train), dtype=np.float64)
         if not self.use_bohb_strategy:
             self.surrogate.train(convert_configurations_to_array(configs_train), results_train, r=n_iteration)
         else:
             if n_iteration == self.R:
                 self.surrogate.train(convert_configurations_to_array(configs_train), results_train)
-
-    def choose_next(self):
-        """
-        sample a config according to MFES. give iterations according to Hyperband strategy.
-        """
-        next_config = None
-        next_n_iteration = self.get_next_n_iteration()
-        next_rung_id = self.get_rung_id(self.bracket, next_n_iteration)
-
-        # sample config
-        excluded_configs = self.bracket[next_rung_id]['configs']
-        if len(self.target_y[self.iterate_r[-1]]) == 0:
-            next_config = sample_configuration(self.config_space, excluded_configs=excluded_configs)
-        else:
-            # Like BOHB, sample a fixed percentage of random configurations.
-            self.random_check_idx += 1
-            if self.random_configuration_chooser.check(self.random_check_idx):
-                next_config = sample_configuration(self.config_space, excluded_configs=excluded_configs)
-            else:
-                acq_configs = self.get_bo_candidates()
-                for config in acq_configs:
-                    if config not in self.bracket[next_rung_id]['configs']:
-                        next_config = config
-                        break
-                if next_config is None:
-                    self.logger.warning('Cannot get a non duplicate configuration from bo candidates. '
-                                        'Sample a random one.')
-                    next_config = sample_configuration(self.config_space, excluded_configs=excluded_configs)
-
-        next_extra_conf = {}
-        return next_config, next_n_iteration, next_extra_conf
 
     def get_next_n_iteration(self):
         """
@@ -199,35 +171,17 @@ class async_mqMFES(async_mqHyperband):
         if self.hb_iter_id == len(self.hb_iter_list):
             self.hb_iter_id = 0
 
-            # # Update weight when the inner loop of hyperband is finished todo
-            # self.weight_update_id += 1
-            # if not self.use_bohb_strategy and \
-            #         self.update_enable and self.weight_update_id > self.s_max - self.skip_outer_loop:
-            #     self.update_weight()
-            #     new_weights = self.hist_weights[-1]     # caution the order of weights
-            #     if self.use_weight_bracket:
-            #         self.hb_bracket_id = self.rng.choice(range(len(self.hb_bracket_list)), p=new_weights)
-            #     else:
-            #         choose_next_bracket()
-            # else:
-            #     choose_next_bracket()
-            choose_next_bracket()
+            # choose bracket according to weights
+            if self.new_weights is not None:
+                self.hb_bracket_id = self.rng.choice(range(len(self.hb_bracket_list)), p=self.new_weights)
+                self.logger.info('choose weighted bracket: weights=%s, bracket_id=%d'
+                                 % (self.new_weights, self.hb_bracket_id))
+            else:
+                choose_next_bracket()
 
             self.hb_iter_list = self.hb_bracket_list[self.hb_bracket_id]
             self.logger.info('iteration list of next bracket: %s' % self.hb_iter_list)
         return next_n_iteration
-
-    def get_bo_candidates(self):
-        std_incumbent_value = np.min(std_normalization(self.target_y[self.iterate_r[-1]]))
-        # Update surrogate model in acquisition function.
-        self.acquisition_function.update(model=self.surrogate, eta=std_incumbent_value,
-                                         num_data=len(self.incumbent_configs))
-
-        challengers = self.acq_optimizer.maximize(
-            runhistory=self.history_container,
-            num_points=5000,
-        )
-        return challengers.challengers
 
     @staticmethod
     def calculate_preserving_order_num(y_pred, y_true):
@@ -261,7 +215,7 @@ class async_mqMFES(async_mqHyperband):
                 for i, r in enumerate(r_list):
                     fold_num = 5
                     if i != K - 1:
-                        mean, var = self.surrogate.surrogate_container[r].predict(test_x)   # todo check median imp!!!
+                        mean, var = self.surrogate.surrogate_container[r].predict(test_x)
                         tmp_y = np.reshape(mean, -1)
                         preorder_num, pair_num = self.calculate_preserving_order_num(tmp_y, test_y)
                         preserving_order_p.append(preorder_num / pair_num)

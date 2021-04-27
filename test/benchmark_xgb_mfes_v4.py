@@ -1,7 +1,7 @@
 """
 example cmdline:
 
-python test/benchmark_xgb_mfes_v3.py --datasets spambase --R 27 --n_jobs 4 --n_workers 1 --rand_prob 0.3 \
+python test/benchmark_xgb_mfes_v4.py --datasets spambase --R 27 --n_jobs 4 --n_workers 1 --rand_prob 0.3 \
 --num_iter 10000 --runtime_limit 60 --rep 1 --start_id 0
 
 """
@@ -15,7 +15,7 @@ import pickle as pkl
 
 sys.path.insert(0, ".")
 sys.path.insert(1, "../lite-bo")    # for dependency
-from mq_hb.mq_mfes_v3 import mqMFES_v3
+from mq_hb.mq_mfes_v4 import mqMFES_v4
 from benchmark_xgb_utils import run_exp
 
 parser = argparse.ArgumentParser()
@@ -63,13 +63,14 @@ print(num_iter, runtime_limit)
 for para in (ip, port, n_jobs, R, eta, n_workers, runtime_limit):
     assert para is not None
 
-algo_name = 'mfesv3'
-algo_class = mqMFES_v3
+algo_name = 'mfesv4'
+algo_class = mqMFES_v4
 # objective_func, config_space, random_state, method_id, runtime_limit, time_limit_per_trial, ip, port
 # are filled in run_exp()
 algo_kwargs = dict(
     R=R, eta=eta,
     rand_prob=rand_prob,
+    non_decreasing_weight=True,
     num_iter=num_iter,
     restart_needed=True,
 )

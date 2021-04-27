@@ -3,7 +3,7 @@ run benchmark_process_record.py first to get new_record file
 
 example cmdline:
 
-python test/benchmark_plot.py --dataset covtype --R 27
+python test/benchmark_plot_test.py --dataset covtype --R 27
 
 """
 import argparse
@@ -12,12 +12,10 @@ import numpy as np
 import pickle as pkl
 import matplotlib.pyplot as plt
 
-from utils import setup_exp, descending, create_plot_points
+from utils import setup_exp, create_plot_points
 
 #default_mths = 'random-n1,random-n3,smac,hyperband-n1,hyperband-n3,bohb-n1,bohb-n3,mfes-n1,mfes-n3'
-default_mths = 'random-n1,random-n3,smac,hyperband-n1,hyperband-n3,bohb-n1,bohb-n3,mfes-n1,mfes-n3,' \
-               'amfes-n1,amfes-n3,mfesv2-n1,mfesv2-n3'
-default_mths = 'hyperband-n8,bohb-n8,mfes-n8,ahb-n8,aweighthb-n8,abohb-n8,abohbnomid-n8,amfesold-n8,amfes-n8'
+default_mths = 'hyperband-n8,bohb-n8,mfes-n8,ahb-n8,amfesv3-n8'
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', type=str)
@@ -30,53 +28,6 @@ dataset = args.dataset
 mths = args.mths.split(',')
 R = args.R
 model = 'xgb'
-
-
-def fetch_color_marker_old(m_list):
-    color_dict = dict()
-    marker_dict = dict()
-    color_list = ['purple', 'royalblue', 'green', 'brown', 'red', 'orange', 'yellowgreen', 'black', 'yellow']
-    markers = ['s', '^', '*', 'v', 'o', 'p', '2', 'x', 'd']
-
-    def fill_values(name, idx):
-        color_dict[name] = color_list[idx]
-        marker_dict[name] = markers[idx]
-
-    for name in m_list:
-        if name.startswith('random-n1'):
-            fill_values(name, 1)
-        elif name.startswith('random-n3'):
-            fill_values(name, 6)
-        elif name.startswith('smac'):
-            fill_values(name, 3)
-        elif name.startswith('hyperband-n1'):
-            fill_values(name, 5)
-        elif name.startswith('hyperband-n3'):
-            fill_values(name, 2)
-        elif name.startswith('bohb-n1'):
-            fill_values(name, 0)
-        elif name.startswith('bohb-n'):
-            fill_values(name, 4)
-        elif name.startswith('mfes-n1'):
-            fill_values(name, 8)
-        elif name.startswith('mfes-n'):
-            fill_values(name, 7)
-        elif name.startswith('amfes-n1'):
-            fill_values(name, 2)
-        elif name.startswith('amfes-n'):
-            fill_values(name, 1)
-        elif name.startswith('mfesv2-n1'):
-            fill_values(name, 3)
-        elif name.startswith('mfesv2-n3'):
-            fill_values(name, 5)
-        elif name.startswith('mfesv3-n1'):
-            fill_values(name, 2)
-        elif name.startswith('mfesv3-n3'):
-            fill_values(name, 1)
-        else:
-            print('color not defined:', name)
-            fill_values(name, 1)
-    return color_dict, marker_dict
 
 
 def fetch_color_marker(m_list):
@@ -134,11 +85,6 @@ def get_mth_legend(mth):
         # Caution
         'ahb-n8': 'ASHA-n8',
         'amfesv3-n8': 'AMFES-n8',
-
-        'random-n3': 'Random-n3',
-        'hyperband-n3': 'Hyperband-n3',
-        'bohb-n3': 'BOHB-n3',
-        'mfes-n3': 'MFES-n3',
     }
     return legend_dict.get(mth_lower, mth)
 
@@ -199,9 +145,19 @@ for mth in mths:
             recorder.sort(key=lambda rec: rec['global_time'])
             # print([(rec['global_time'], rec['return_info']['loss']) for rec in recorder])
             print('new recorder len:', mth, len(recorder), len(raw_recorder))
-            timestamp = [rec['global_time'] for rec in recorder]
-            perf = descending([rec['return_info']['loss'] for rec in recorder])
-            stats.append((timestamp, perf))
+
+            best_val_perf = recorder[0]['return_info']['loss']
+            timestamps = [recorder[0]['global_time']]
+            test_perfs = [recorder[0]['return_info'].get('test_perf', None)]
+            if test_perfs[0] is None:
+                raise ValueError('%s\n%s does not have test_perf!' % (recorder[0], mth))
+            for rec in recorder[1:]:
+                val_perf = rec['return_info']['loss']
+                if val_perf < best_val_perf:
+                    best_val_perf = val_perf
+                    timestamps.append(rec['global_time'])
+                    test_perfs.append(rec['return_info']['test_perf'])
+            stats.append((timestamps, test_perfs))
             # for debugging
             # if mth == 'smac':
             #     plt.plot(timestamp, perf, label=file)
@@ -209,7 +165,7 @@ for mth in mths:
     result[mth] = (x, m, s)
     # plot
     plt.plot(x, m, lw=lw, label=get_mth_legend(mth),
-             #color=color_dict[mth], marker=marker_dict[mth],
+             color=color_dict[mth], marker=marker_dict[mth],
              markersize=markersize, markevery=markevery)
     #plt.fill_between(x, m - s * std_scale, m + s * std_scale, alpha=alpha, facecolor=color_dict[mth])
 
@@ -239,6 +195,18 @@ for mth in mths:
                 break
         speedup = baseline_time / mth_time
         print("%s %s %.2f" % (mth, baseline, speedup))
+
+# print last test perf
+print('===== mth - last test perf =====')
+for mth in mths:
+    x, m, s = result[mth]
+    m = m[-1]
+    s = s[-1]
+    perfs = None
+    if dataset == 'kuaishou1':
+        print(dataset, mth, perfs, u'%.5f\u00B1%.5f' % (m, s))
+    else:
+        print(dataset, mth, perfs, u'%.4f\u00B1%.4f' % (m, s))
 
 # plt.axhline(-0.849296, linestyle="--", color="b", lw=1, label="Default")
 # plt.ylim(-0.863, -0.844)

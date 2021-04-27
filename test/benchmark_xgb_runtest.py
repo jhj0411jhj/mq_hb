@@ -25,7 +25,6 @@ default_mths = 'random-n1,random-n3,smac,hyperband-n1,hyperband-n3,bohb-n1,bohb-
 parser = argparse.ArgumentParser()
 parser.add_argument('--datasets', type=str, default=default_datasets)
 parser.add_argument('--mths', type=str, default=default_mths)
-parser.add_argument('--n_jobs', type=int, default=4)
 parser.add_argument('--rep', type=int, default=1)
 parser.add_argument('--start_id', type=int, default=0)
 parser.add_argument('--show_mode', type=int, default=0)
@@ -34,18 +33,17 @@ parser.add_argument('--runtime_limit', type=int)    # if you don't want to use d
 args = parser.parse_args()
 test_datasets = args.datasets.split(',')
 mths = args.mths.split(',')
-n_jobs = args.n_jobs    # changed according to dataset
 rep = args.rep
 start_id = args.start_id
 show_mode = args.show_mode
 
-print(n_jobs, test_datasets)
+print(test_datasets)
 
 
-def test_func(config, x_train, x_test, y_train, y_test, seed):
+def test_func(config, x_train, x_test, y_train, y_test):
     from mq_hb.xgb_model import XGBoost
     conf_dict = config.get_dictionary()
-    model = XGBoost(**conf_dict, n_jobs=n_jobs, seed=seed)
+    model = XGBoost(**conf_dict, n_jobs=n_jobs, seed=47)
     model.fit(x_train, y_train)
     # test
     y_pred = model.predict(x_test)
@@ -79,7 +77,7 @@ if show_mode == 1:
 check_datasets(test_datasets)
 for dataset in test_datasets:
     # setup
-    n_jobs, runtime_limit, _ = setup_exp(dataset, n_jobs, 1, 1)
+    n_jobs, runtime_limit, _ = setup_exp(dataset, 4, 1, 1)
     if args.runtime_limit is not None:
         runtime_limit = args.runtime_limit
     x_train, x_val, x_test, y_train, y_val, y_test = load_data(dataset)
@@ -99,7 +97,7 @@ for dataset in test_datasets:
 
                     # run test
                     config = record['configuration']
-                    perf = test_func(config, x_train, x_test, y_train, y_test, seed)
+                    perf = test_func(config, x_train, x_test, y_train, y_test)
                     print(dataset, mth, seed, 'perf =', perf)
 
                     # save perf

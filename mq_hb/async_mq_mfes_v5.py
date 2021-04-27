@@ -21,9 +21,12 @@ from litebo.utils.config_space.util import convert_configurations_to_array
 from litebo.utils.history_container import HistoryContainer
 
 
-class async_mqMFES(async_mqHyperband):
+class async_mqMFES_v5(async_mqHyperband):
     """
     The implementation of Asynchronous MFES (combine ASHA and MFES)
+    before fix
+    no median
+    promotion start threshold: from v3 complete/promoted jobs -> all jobs (loose conditions)
     """
 
     def __init__(self, objective_func,
@@ -106,6 +109,57 @@ class async_mqMFES(async_mqHyperband):
         self.random_configuration_chooser = ChooserProb(prob=rand_prob, rng=self.rng)
         self.random_check_idx = 0
 
+    def create_bracket(self):
+        """
+        bracket : list of rungs
+        rung: {
+            'rung_id': rung id (the lowest rung is 0),
+            'n_iteration': iterations (resource) per config for evaluation,
+            'jobs': list of [job_status, config, perf, extra_conf],
+            'configs': set of all configs in the rung,
+            'num_promoted': number of promoted configs in the rung,
+            'promotion_start_threshold':
+                promotion starts when number of all jobs greater than threshold,
+        }
+        job_status: RUNNING, COMPLETED, PROMOTED
+        """
+        self.bracket = list()
+        s = self.s_max
+        # Initial number of iterations per config
+        r = self.R * self.eta ** (-s)
+        for i in range(s + 1):
+            n_iteration = r * self.eta ** (i)
+            promotion_start_threshold = self.R * self.eta ** (-i)
+            rung = dict(
+                rung_id=i,
+                n_iteration=n_iteration,
+                jobs=list(),
+                configs=set(),
+                num_promoted=0,
+                promotion_start_threshold=promotion_start_threshold,    # set promotion start threshold
+            )
+            self.bracket.append(rung)
+        self.logger.info('Init bracket: %s.' % str(self.bracket))
+
+    def can_promote(self, rung_id):
+        """
+        return whether configs can be promoted in current rung
+        """
+        # if not enough jobs, do not promote
+        num_completed_promoted = len([job for job in self.bracket[rung_id]['jobs']
+                                      if job[0] in (COMPLETED, PROMOTED)])
+        num_promoted = self.bracket[rung_id]['num_promoted']
+        if num_completed_promoted == 0 or (num_promoted + 1) / num_completed_promoted > 1 / self.eta:
+            return False
+
+        # prevent error promotion in start stage
+        num_all = len(self.bracket[rung_id]['jobs'])
+        promotion_start_threshold = self.bracket[rung_id]['promotion_start_threshold']
+        if num_all < promotion_start_threshold:
+            return False
+
+        return True
+
     def update_observation(self, config, perf, n_iteration):
         rung_id = self.get_rung_id(self.bracket, n_iteration)
 
@@ -138,14 +192,14 @@ class async_mqMFES(async_mqHyperband):
             # Update history container.
             self.history_container.add(config, perf)
 
-            # todo: fix: update weight. len>=5 ?
-            if not self.use_bohb_strategy and self.update_enable and len(self.incumbent_configs) >= 5:
-                self.update_weight()
-                new_weights = self.hist_weights[-1]  # caution the order of weights
+            # # todo: fix: update weight. len>=5 ?
+            # if not self.use_bohb_strategy and self.update_enable and len(self.incumbent_configs) >= 5:
+            #     self.update_weight()
+            #     new_weights = self.hist_weights[-1]  # caution the order of weights
 
-        # Refit the ensemble surrogate model.
-        configs_train = self.target_x[n_iteration] + configs_running
-        results_train = self.target_y[n_iteration] + [value_imputed] * len(configs_running)
+        # Refit the ensemble surrogate model. todo: no median
+        configs_train = self.target_x[n_iteration]
+        results_train = self.target_y[n_iteration]
         results_train = np.array(std_normalization(results_train), dtype=np.float64)
         if not self.use_bohb_strategy:
             self.surrogate.train(convert_configurations_to_array(configs_train), results_train, r=n_iteration)
@@ -199,19 +253,22 @@ class async_mqMFES(async_mqHyperband):
         if self.hb_iter_id == len(self.hb_iter_list):
             self.hb_iter_id = 0
 
-            # # Update weight when the inner loop of hyperband is finished todo
-            # self.weight_update_id += 1
-            # if not self.use_bohb_strategy and \
-            #         self.update_enable and self.weight_update_id > self.s_max - self.skip_outer_loop:
-            #     self.update_weight()
-            #     new_weights = self.hist_weights[-1]     # caution the order of weights
-            #     if self.use_weight_bracket:
-            #         self.hb_bracket_id = self.rng.choice(range(len(self.hb_bracket_list)), p=new_weights)
-            #     else:
-            #         choose_next_bracket()
-            # else:
-            #     choose_next_bracket()
-            choose_next_bracket()
+            # Update weight when the inner loop of hyperband is finished todo
+            self.weight_update_id += 1
+            if not self.use_bohb_strategy and \
+                    self.update_enable and self.weight_update_id > self.s_max - self.skip_outer_loop:
+                self.update_weight()
+                if len(self.hist_weights) > 0:
+                    new_weights = self.hist_weights[-1]     # caution the order of weights
+                else:
+                    new_weights = None
+                if self.use_weight_bracket and new_weights is not None:
+                    self.hb_bracket_id = self.rng.choice(range(len(self.hb_bracket_list)), p=new_weights)
+                else:
+                    choose_next_bracket()
+            else:
+                choose_next_bracket()
+            #choose_next_bracket()
 
             self.hb_iter_list = self.hb_bracket_list[self.hb_bracket_id]
             self.logger.info('iteration list of next bracket: %s' % self.hb_iter_list)
@@ -247,6 +304,8 @@ class async_mqMFES(async_mqHyperband):
 
         max_r = self.iterate_r[-1]
         incumbent_configs = self.target_x[max_r]
+        if len(incumbent_configs) < 3:
+            return
         test_x = convert_configurations_to_array(incumbent_configs)
         test_y = np.array(self.target_y[max_r], dtype=np.float64)
 

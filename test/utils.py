@@ -26,13 +26,41 @@ def setup_exp(_dataset, n_jobs, runtime_limit, time_limit_per_trial):
         runtime_limit = 2 * 3600            # 2h
         time_limit_per_trial = 600          # 10min
     elif _dataset == 'HIGGS':
-        n_jobs = 8
-        runtime_limit = 24 * 3600           # 24h
-        time_limit_per_trial = 999999
-    elif _dataset == 'covtype':
-        n_jobs = 4
+        n_jobs = 15
         runtime_limit = 12 * 3600           # 12h
-        time_limit_per_trial = 2 * 3600     # 2h
+        time_limit_per_trial = 999999
+    elif _dataset == 'hepmass':
+        n_jobs = 15
+        runtime_limit = 12 * 3600           # 12h
+        time_limit_per_trial = 999999
+    elif _dataset == 'HIGGS220w':
+        n_jobs = 15
+        runtime_limit = 2 * 3600            # 2h
+        time_limit_per_trial = 999999
+    elif _dataset == 'hepmass210w':
+        n_jobs = 15
+        runtime_limit = 6 * 3600            # 6h
+        time_limit_per_trial = 999999
+    elif _dataset == 'pokerhand':
+        n_jobs = 15
+        runtime_limit = 2 * 3600            # 2h
+        time_limit_per_trial = 999999
+    elif _dataset == 'SUSY':
+        n_jobs = 15
+        runtime_limit = 6 * 3600            # 6h
+        time_limit_per_trial = 999999
+    elif _dataset == 'censusincome':
+        n_jobs = 15
+        runtime_limit = 1 * 3600            # 1h
+        time_limit_per_trial = 999999
+    # elif _dataset == 'covtype':
+    #     n_jobs = 4
+    #     runtime_limit = 12 * 3600           # 12h
+    #     time_limit_per_trial = 2 * 3600     # 2h
+    elif _dataset == 'covtype':
+        n_jobs = 15
+        runtime_limit = 3 * 3600            # 3h
+        time_limit_per_trial = 999999
     elif _dataset == 'codrna':
         n_jobs = 4
         runtime_limit = 3000                # 50min

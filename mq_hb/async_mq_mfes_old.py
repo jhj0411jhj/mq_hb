@@ -21,9 +21,11 @@ from litebo.utils.config_space.util import convert_configurations_to_array
 from litebo.utils.history_container import HistoryContainer
 
 
-class async_mqMFES(async_mqHyperband):
+class async_mqMFES_old(async_mqHyperband):
     """
     The implementation of Asynchronous MFES (combine ASHA and MFES)
+    before fix
+    with median
     """
 
     def __init__(self, objective_func,
@@ -138,10 +140,10 @@ class async_mqMFES(async_mqHyperband):
             # Update history container.
             self.history_container.add(config, perf)
 
-            # todo: fix: update weight. len>=5 ?
-            if not self.use_bohb_strategy and self.update_enable and len(self.incumbent_configs) >= 5:
-                self.update_weight()
-                new_weights = self.hist_weights[-1]  # caution the order of weights
+            # # todo: fix: update weight. len>=5 ?
+            # if not self.use_bohb_strategy and self.update_enable and len(self.incumbent_configs) >= 5:
+            #     self.update_weight()
+            #     new_weights = self.hist_weights[-1]  # caution the order of weights
 
         # Refit the ensemble surrogate model.
         configs_train = self.target_x[n_iteration] + configs_running
@@ -199,19 +201,22 @@ class async_mqMFES(async_mqHyperband):
         if self.hb_iter_id == len(self.hb_iter_list):
             self.hb_iter_id = 0
 
-            # # Update weight when the inner loop of hyperband is finished todo
-            # self.weight_update_id += 1
-            # if not self.use_bohb_strategy and \
-            #         self.update_enable and self.weight_update_id > self.s_max - self.skip_outer_loop:
-            #     self.update_weight()
-            #     new_weights = self.hist_weights[-1]     # caution the order of weights
-            #     if self.use_weight_bracket:
-            #         self.hb_bracket_id = self.rng.choice(range(len(self.hb_bracket_list)), p=new_weights)
-            #     else:
-            #         choose_next_bracket()
-            # else:
-            #     choose_next_bracket()
-            choose_next_bracket()
+            # Update weight when the inner loop of hyperband is finished todo
+            self.weight_update_id += 1
+            if not self.use_bohb_strategy and \
+                    self.update_enable and self.weight_update_id > self.s_max - self.skip_outer_loop:
+                self.update_weight()
+                if len(self.hist_weights) > 0:
+                    new_weights = self.hist_weights[-1]     # caution the order of weights
+                else:
+                    new_weights = None
+                if self.use_weight_bracket and new_weights is not None:
+                    self.hb_bracket_id = self.rng.choice(range(len(self.hb_bracket_list)), p=new_weights)
+                else:
+                    choose_next_bracket()
+            else:
+                choose_next_bracket()
+            #choose_next_bracket()
 
             self.hb_iter_list = self.hb_bracket_list[self.hb_bracket_id]
             self.logger.info('iteration list of next bracket: %s' % self.hb_iter_list)
@@ -247,6 +252,8 @@ class async_mqMFES(async_mqHyperband):
 
         max_r = self.iterate_r[-1]
         incumbent_configs = self.target_x[max_r]
+        if len(incumbent_configs) < 3:
+            return
         test_x = convert_configurations_to_array(incumbent_configs)
         test_y = np.array(self.target_y[max_r], dtype=np.float64)
 

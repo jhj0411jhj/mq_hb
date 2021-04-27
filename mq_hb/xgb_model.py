@@ -6,7 +6,7 @@ from litebo.utils.config_space import UniformFloatHyperparameter, UniformInteger
 class XGBoost:
     def __init__(self, n_estimators, learning_rate, max_depth, min_child_weight,
                  subsample, colsample_bytree, gamma=None, reg_alpha=None, reg_lambda=None,
-                 n_jobs=4, seed=1):
+                 n_jobs=4, seed=47):
         self.n_estimators = int(n_estimators)
         self.learning_rate = learning_rate
         self.max_depth = max_depth

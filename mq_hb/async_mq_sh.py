@@ -82,16 +82,14 @@ class async_mqSuccessiveHalving(async_mqBaseFacade):
         next_extra_conf = None
         # find promotable config from top to bottom
         for rung_id in reversed(range(len(self.bracket) - 1)):
+            # if not enough jobs, do not promote
+            if not self.can_promote(rung_id):
+                continue
+
             # job: [job_status, config, perf, extra_conf]
             self.bracket[rung_id]['jobs'] = sorted(self.bracket[rung_id]['jobs'], key=lambda x: x[2])
             complete_jobs = [(job_id, job) for job_id, job in enumerate(self.bracket[rung_id]['jobs'])
                              if job[0] in (COMPLETED, PROMOTED)]
-
-            # if not enough jobs, do not promote
-            num_completed_promoted = len(complete_jobs)
-            num_promoted = self.bracket[rung_id]['num_promoted']
-            if num_completed_promoted == 0 or (num_promoted + 1) / num_completed_promoted > 1 / self.eta:
-                continue
 
             # keep the first 1/eta
             candidate_jobs = complete_jobs[0: int(len(complete_jobs) / self.eta)]
@@ -135,6 +133,19 @@ class async_mqSuccessiveHalving(async_mqBaseFacade):
 
         # print('=== bracket after get_job:', self.get_bracket_status(self.bracket))
         return next_config, next_n_iteration, next_extra_conf
+
+    def can_promote(self, rung_id):
+        """
+        return whether configs can be promoted in current rung
+        """
+        # if not enough jobs, do not promote
+        num_completed_promoted = len([job for job in self.bracket[rung_id]['jobs']
+                                      if job[0] in (COMPLETED, PROMOTED)])
+        num_promoted = self.bracket[rung_id]['num_promoted']
+        if num_completed_promoted == 0 or (num_promoted + 1) / num_completed_promoted > 1 / self.eta:
+            return False
+
+        return True
 
     def update_observation(self, config, perf, n_iteration):
         rung_id = self.get_rung_id(self.bracket, n_iteration)

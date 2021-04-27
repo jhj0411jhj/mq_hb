@@ -104,8 +104,8 @@ def evaluate_parallel(method_id, n_workers, seed, ip, port):
         worker.start()
 
     master.join()   # wait for master to gen result
-    for w in worker_pool:   # optional if repeat=1
-        w.join()
+    for w in worker_pool:
+        w.kill()
 
     return list(recorder)   # covert to list
 
