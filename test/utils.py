@@ -1,6 +1,7 @@
 import os
 import time
 import contextlib
+import traceback
 import numpy as np
 import pickle as pkl
 
@@ -35,7 +36,7 @@ def setup_exp(_dataset, n_jobs, runtime_limit, time_limit_per_trial):
         time_limit_per_trial = 999999
     elif _dataset == 'HIGGS220w':
         n_jobs = 15
-        runtime_limit = 2 * 3600            # 2h
+        runtime_limit = 6 * 3600            # 6h
         time_limit_per_trial = 999999
     elif _dataset == 'hepmass210w':
         n_jobs = 15
@@ -112,7 +113,8 @@ def check_datasets(datasets):
         try:
             _ = load_data(_dataset)
         except Exception as e:
-            print('Dataset - %s load error: %s' % (_dataset, str(e)))
+            print('Dataset - %s load error' % (_dataset))
+            print(traceback.format_exc())
             raise
 
 

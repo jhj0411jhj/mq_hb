@@ -15,9 +15,7 @@ import matplotlib.pyplot as plt
 from utils import setup_exp, descending, create_plot_points
 
 #default_mths = 'random-n1,random-n3,smac,hyperband-n1,hyperband-n3,bohb-n1,bohb-n3,mfes-n1,mfes-n3'
-default_mths = 'random-n1,random-n3,smac,hyperband-n1,hyperband-n3,bohb-n1,bohb-n3,mfes-n1,mfes-n3,' \
-               'amfes-n1,amfes-n3,mfesv2-n1,mfesv2-n3'
-default_mths = 'hyperband-n8,bohb-n8,mfes-n8,ahb-n8,aweighthb-n8,abohb-n8,abohbnomid-n8,amfesold-n8,amfes-n8'
+default_mths = 'hyperband-n8,bohb-n8,mfes-n8,amfesv0-n8,amfesv3-n8,amfesv6-n8'
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', type=str)

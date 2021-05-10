@@ -1,5 +1,6 @@
 import os
 import time
+import traceback
 import pickle as pkl
 import numpy as np
 from functools import partial
@@ -11,6 +12,7 @@ from mq_hb.mq_mf_worker import mqmfWorker
 from mq_hb.async_mq_mf_worker import async_mqmfWorker
 from mq_hb.xgb_model import XGBoost
 from utils import load_data, setup_exp, check_datasets, seeds
+from benchmark_process_record import remove_partial, get_incumbent
 
 
 def mf_objective_func(config, n_resource, extra_conf,
@@ -157,3 +159,14 @@ def run_exp(test_datasets, algo_class, algo_kwargs, algo_name, n_workers, parall
             with open(os.path.join(dir_path, file_name), 'wb') as f:
                 pkl.dump(recorder, f)
             print(dir_path, file_name, 'saved!', flush=True)
+
+            if rep > 1 or len(test_datasets) > 1:
+                time.sleep(300)
+
+        try:
+            model_name = 'xgb'
+            mths = [method_str]
+            remove_partial(model_name, dataset, mths, runtime_limit, R)
+            get_incumbent(model_name, dataset, mths, runtime_limit)
+        except Exception as e:
+            print('benchmark process record failed: %s' % (traceback.format_exc(),))
