@@ -14,7 +14,7 @@ import numpy as np
 import pickle as pkl
 
 sys.path.insert(0, ".")
-sys.path.insert(1, "../lite-bo")    # for dependency
+sys.path.insert(1, "../open-box")    # for dependency
 from mq_hb.async_mq_mfes_v11 import async_mqMFES_v11
 from benchmark_xgb_utils import run_exp
 

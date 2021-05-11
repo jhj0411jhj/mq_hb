@@ -14,7 +14,7 @@ import numpy as np
 import pickle as pkl
 
 sys.path.insert(0, ".")
-sys.path.insert(1, "../lite-bo")  # for dependency
+sys.path.insert(1, "../open-box")  # for dependency
 from mq_hb.mq_random_search import mqRandomSearch
 from benchmark_xgb_utils import run_exp
 
@@ -62,6 +62,7 @@ algo_class = mqRandomSearch
 # objective_func, config_space, random_state, method_id, runtime_limit, time_limit_per_trial, ip, port
 # are filled in run_exp()
 algo_kwargs = dict(
+    R=R,
     n_workers=n_workers,
     num_iter=num_iter,
     restart_needed=True,

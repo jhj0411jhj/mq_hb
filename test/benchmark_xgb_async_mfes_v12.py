@@ -1,7 +1,7 @@
 """
 example cmdline:
 
-python test/benchmark_xgb_async_mfes_v2.py --datasets spambase --R 27 --n_jobs 4 --n_workers 1 --rand_prob 0.3 \
+python test/benchmark_xgb_async_mfes_v12.py --datasets spambase --R 27 --n_jobs 4 --n_workers 1 --rand_prob 0.3 \
 --skip_outer_loop 0 --runtime_limit 60 --rep 1 --start_id 0
 
 """
@@ -15,7 +15,7 @@ import pickle as pkl
 
 sys.path.insert(0, ".")
 sys.path.insert(1, "../open-box")    # for dependency
-from mq_hb.async_mq_mfes_v2 import async_mqMFES_v2
+from mq_hb.async_mq_mfes_v12 import async_mqMFES_v12
 from benchmark_xgb_utils import run_exp
 
 parser = argparse.ArgumentParser()
@@ -63,8 +63,8 @@ print(runtime_limit)
 for para in (ip, port, n_jobs, R, eta, n_workers, runtime_limit):
     assert para is not None
 
-algo_name = 'amfesv2'
-algo_class = async_mqMFES_v2
+algo_name = 'amfesv12'
+algo_class = async_mqMFES_v12
 # objective_func, config_space, random_state, method_id, runtime_limit, time_limit_per_trial, ip, port
 # are filled in run_exp()
 algo_kwargs = dict(

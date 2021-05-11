@@ -3,8 +3,8 @@ import os
 import traceback
 import numpy as np
 import pickle as pkl
-from litebo.utils.logging_utils import get_logger, setup_logger
-from litebo.core.message_queue.master_messager import MasterMessager
+from openbox.utils.logging_utils import get_logger, setup_logger
+from openbox.core.message_queue.master_messager import MasterMessager
 
 PLOT = False
 try:

@@ -5,8 +5,8 @@ from mq_hb.async_mq_base_facade import async_mqBaseFacade
 from mq_hb.utils import RUNNING, COMPLETED, PROMOTED
 from mq_hb.utils import sample_configuration
 
-from litebo.utils.config_space import ConfigurationSpace
-from litebo.utils.constants import MAXINT
+from openbox.utils.config_space import ConfigurationSpace
+from openbox.utils.constants import MAXINT
 
 
 class async_mqSuccessiveHalving(async_mqBaseFacade):

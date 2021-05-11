@@ -13,7 +13,7 @@ from sklearn.metrics import balanced_accuracy_score
 
 import sys
 sys.path.append('.')
-sys.path.insert(0, '../lite-bo')    # for dependency
+sys.path.insert(0, '../open-box')    # for dependency
 from mq_hb.mq_hb import mqHyperband
 from mq_hb.mq_mf_worker import mqmfWorker
 from mq_hb.xgb_model import XGBoost

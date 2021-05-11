@@ -1,6 +1,6 @@
 from typing import List
 import numpy as np
-from litebo.utils.config_space import Configuration, ConfigurationSpace
+from openbox.utils.config_space import Configuration, ConfigurationSpace
 
 RUNNING = 'running'
 COMPLETED = 'completed'

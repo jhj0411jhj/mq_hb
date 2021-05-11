@@ -1,5 +1,5 @@
-from litebo.utils.config_space import ConfigurationSpace
-from litebo.core.sync_batch_advisor import SyncBatchAdvisor, SUCCESS
+from openbox.utils.config_space import ConfigurationSpace
+from openbox.core.sync_batch_advisor import SyncBatchAdvisor, SUCCESS
 from mq_hb.mq_hb import mqHyperband
 from mq_hb.utils import sample_configurations, expand_configurations
 
@@ -33,7 +33,7 @@ class mqBOHB(mqHyperband):
         self.rand_prob = rand_prob
         self.bo_init_num = bo_init_num
         task_info = {'num_constraints': 0, 'num_objs': 1}
-        # using median_imputation batch_strategy implemented in LiteBO to generate BO suggestions
+        # using median_imputation batch_strategy implemented in OpenBox to generate BO suggestions
         self.config_advisor = SyncBatchAdvisor(config_space, task_info,
                                                batch_size=None,
                                                batch_strategy='median_imputation',
@@ -78,7 +78,7 @@ class mqBOHB(mqHyperband):
         # update config advisor
         for config, perf in zip(T, val_losses):
             objs = [perf]
-            observation = (config, SUCCESS, None, objs)   # config, trial_state, constraints, objs
+            observation = (config, SUCCESS, None, objs, None)   # config, trial_state, constraints, objs, elapsed_time
             self.config_advisor.update_observation(observation)
             self.logger.info('update observation: config=%s, perf=%f' % (str(config), perf))
         self.logger.info('%d observations updated. %d incumbent configs total.' % (len(T), len(self.incumbent_configs)))

@@ -1,14 +1,14 @@
-from litebo.utils.config_space import ConfigurationSpace
+from openbox.utils.config_space import ConfigurationSpace
 from mq_hb.mq_hb import mqHyperband
 from mq_hb.utils import sample_configurations, expand_configurations
 
 import numpy as np
-from litebo.utils.util_funcs import get_types
-from litebo.acquisition_function.acquisition import EI
-from litebo.surrogate.base.rf_with_instances import RandomForestWithInstances
-from litebo.utils.config_space.util import convert_configurations_to_array
-from litebo.utils.config_space import get_one_exchange_neighbourhood
-from litebo.utils.constants import MAXINT
+from openbox.utils.util_funcs import get_types
+from openbox.acquisition_function.acquisition import EI
+from openbox.surrogate.base.rf_with_instances import RandomForestWithInstances
+from openbox.utils.config_space.util import convert_configurations_to_array
+from openbox.utils.config_space import get_one_exchange_neighbourhood
+from openbox.utils.constants import MAXINT
 
 
 class RandomSampling(object):

@@ -1,6 +1,6 @@
 import numpy as np
-from litebo.surrogate.base.base_model import AbstractModel
-from litebo.surrogate.base.rf_with_instances import RandomForestWithInstances
+from openbox.surrogate.base.base_model import AbstractModel
+from openbox.surrogate.base.rf_with_instances import RandomForestWithInstances
 
 
 class RandomForestEnsemble(AbstractModel):

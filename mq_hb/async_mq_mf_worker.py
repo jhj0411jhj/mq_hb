@@ -1,9 +1,9 @@
 import sys
 import time
 import traceback
-from litebo.utils.constants import MAXINT, SUCCESS, FAILED, TIMEOUT
-from litebo.utils.limit import time_limit, TimeoutException
-from litebo.core.message_queue.worker_messager import WorkerMessager
+from openbox.utils.constants import MAXINT, SUCCESS, FAILED, TIMEOUT
+from openbox.utils.limit import time_limit, TimeoutException
+from openbox.core.message_queue.worker_messager import WorkerMessager
 
 
 def no_time_limit_func(objective_function, time_limit_per_trial, args, kwargs):

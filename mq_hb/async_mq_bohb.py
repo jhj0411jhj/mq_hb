@@ -7,14 +7,14 @@ from mq_hb.utils import RUNNING, COMPLETED, PROMOTED
 from mq_hb.utils import sample_configuration
 from mq_hb.utils import minmax_normalization, std_normalization
 
-from litebo.utils.util_funcs import get_types
-from litebo.utils.config_space import ConfigurationSpace
-from litebo.acquisition_function.acquisition import EI
-from litebo.surrogate.base.rf_with_instances import RandomForestWithInstances
-from litebo.utils.config_space.util import convert_configurations_to_array
+from openbox.utils.util_funcs import get_types
+from openbox.utils.config_space import ConfigurationSpace
+from openbox.acquisition_function.acquisition import EI
+from openbox.surrogate.base.rf_with_instances import RandomForestWithInstances
+from openbox.utils.config_space.util import convert_configurations_to_array
 
-from litebo.utils.config_space import get_one_exchange_neighbourhood
-from litebo.utils.constants import MAXINT
+from openbox.utils.config_space import get_one_exchange_neighbourhood
+from openbox.utils.constants import MAXINT
 from mq_hb.utils import sample_configurations
 
 

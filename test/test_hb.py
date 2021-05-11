@@ -11,11 +11,11 @@ import numpy as np
 
 import sys
 sys.path.append('.')
-sys.path.insert(0, '../lite-bo')    # for dependency
+sys.path.insert(0, '../open-box')    # for dependency
 from mq_hb.mq_hb import mqHyperband
 from mq_hb.mq_mf_worker import mqmfWorker
 
-from litebo.utils.config_space import ConfigurationSpace, Configuration, \
+from openbox.utils.config_space import ConfigurationSpace, Configuration, \
     UniformFloatHyperparameter, UniformIntegerHyperparameter
 
 

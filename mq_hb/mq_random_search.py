@@ -4,7 +4,7 @@ import numpy as np
 from mq_hb.mq_base_facade import mqBaseFacade
 from mq_hb.utils import sample_configurations
 
-from litebo.utils.config_space import ConfigurationSpace
+from openbox.utils.config_space import ConfigurationSpace
 
 
 class mqRandomSearch(mqBaseFacade):

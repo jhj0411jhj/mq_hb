@@ -11,14 +11,14 @@ from mq_hb.utils import sample_configuration
 from mq_hb.utils import minmax_normalization, std_normalization
 from mq_hb.surrogate.rf_ensemble import RandomForestEnsemble
 
-from litebo.utils.util_funcs import get_types
-from litebo.utils.config_space import ConfigurationSpace
-from litebo.acquisition_function.acquisition import EI
-from litebo.surrogate.base.rf_with_instances import RandomForestWithInstances
-from litebo.acq_maximizer.ei_optimization import InterleavedLocalAndRandomSearch, RandomSearch
-from litebo.acq_maximizer.random_configuration_chooser import ChooserProb
-from litebo.utils.config_space.util import convert_configurations_to_array
-from litebo.utils.history_container import HistoryContainer
+from openbox.utils.util_funcs import get_types
+from openbox.utils.config_space import ConfigurationSpace
+from openbox.acquisition_function.acquisition import EI
+from openbox.surrogate.base.rf_with_instances import RandomForestWithInstances
+from openbox.acq_maximizer.ei_optimization import InterleavedLocalAndRandomSearch, RandomSearch
+from openbox.acq_maximizer.random_configuration_chooser import ChooserProb
+from openbox.utils.config_space.util import convert_configurations_to_array
+from openbox.utils.history_container import HistoryContainer
 
 
 class async_mqMFES_v6(async_mqHyperband):

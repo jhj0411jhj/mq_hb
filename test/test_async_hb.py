@@ -12,11 +12,11 @@ from multiprocessing import Process, Manager
 
 import sys
 sys.path.append('.')
-sys.path.insert(0, '../lite-bo')    # for dependency
+sys.path.insert(0, '../open-box')    # for dependency
 from mq_hb.async_mq_hb import async_mqHyperband
 from mq_hb.async_mq_mf_worker import async_mqmfWorker
 
-from litebo.utils.config_space import ConfigurationSpace, Configuration, \
+from openbox.utils.config_space import ConfigurationSpace, Configuration, \
     UniformFloatHyperparameter, UniformIntegerHyperparameter
 
 

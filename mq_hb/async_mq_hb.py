@@ -2,7 +2,7 @@ from math import ceil
 from mq_hb.utils import sample_configuration
 from mq_hb.async_mq_sh import async_mqSuccessiveHalving
 
-from litebo.utils.config_space import ConfigurationSpace
+from openbox.utils.config_space import ConfigurationSpace
 
 
 class async_mqHyperband(async_mqSuccessiveHalving):

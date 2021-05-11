@@ -15,7 +15,7 @@ import pickle as pkl
 from sklearn.metrics import balanced_accuracy_score
 
 sys.path.insert(0, ".")
-sys.path.insert(1, "../lite-bo")    # for dependency
+sys.path.insert(1, "../open-box")    # for dependency
 from utils import load_data, setup_exp, check_datasets, seeds
 
 # default_datasets = 'mnist_784,higgs,covertype'
