@@ -41,23 +41,23 @@ def fetch_color_marker(m_list):
         marker_dict[name] = markers[idx]
 
     for name in m_list:
-        if name.startswith('random-n'):
+        if name.startswith('random'):
             fill_values(name, 0)
         elif name.startswith('smac'):
             fill_values(name, 6)
-        # elif name.startswith('sh-n'):
+        # elif name.startswith('sh'):
         #     fill_values(name, 2)
-        elif name.startswith('hyperband-n'):
+        elif name.startswith('hyperband'):
             fill_values(name, 2)
-        elif name.startswith('bohb-n'):
+        elif name.startswith('bohb'):
             fill_values(name, 1)
-        elif name.startswith('mfes-n'):
+        elif name.startswith('mfes'):
             fill_values(name, 5)
-        # elif name.startswith('asha-n'):
+        # elif name.startswith('asha'):
         #     fill_values(name, 7)
-        elif name.startswith('ahb-n'):
+        elif name.startswith('ahb'):
             fill_values(name, 7)
-        # elif name.startswith('abohb-n'):
+        # elif name.startswith('abohb'):
         #     fill_values(name, 8)
         elif name.startswith('amfes'):
             fill_values(name, 4)
@@ -67,7 +67,7 @@ def fetch_color_marker(m_list):
     return color_dict, marker_dict
 
 
-def get_mth_legend(mth):
+def get_mth_legend(mth, show_mode=False):
     mth_lower = mth.lower()
     legend_dict = {
         'random-n1': 'Random-n1',
@@ -75,17 +75,25 @@ def get_mth_legend(mth):
         'hyperband-n1': 'Hyperband-n1',
         'bohb-n1': 'BOHB-n1',
         'mfes-n1': 'MFES-n1',
-        # Caution
-        'ahb-n1': 'ASHA-n1',
-        'amfesv3-n1': 'AMFES-n1',
 
         'hyperband-n8': 'Hyperband-n8',
         'bohb-n8': 'BOHB-n8',
         'mfes-n8': 'MFES-n8',
-        # Caution
-        'ahb-n8': 'ASHA-n8',
-        'amfesv3-n8': 'AMFES-n8',
+
+        'random-n3': 'Random-n3',
+        'hyperband-n3': 'Hyperband-n3',
+        'bohb-n3': 'BOHB-n3',
+        'mfes-n3': 'MFES-n3',
     }
+    if show_mode:
+        if mth.startswith('amfes') and mth.endswith('-n8'):
+            mth = 'AMFES-n8'
+        if mth.startswith('mfes') and mth.endswith('-n8'):
+            mth = 'MFES-n8'
+        legend_dict['ahb-n1'] = 'ASHA-n1'
+        legend_dict['ahb-n8'] = 'ASHA-n8'
+        legend_dict['bohbv0-n1'] = 'BOHB-n1'
+        legend_dict['bohbv0-n8'] = 'BOHB-n8'
     return legend_dict.get(mth_lower, mth)
 
 
@@ -103,11 +111,17 @@ def plot_setup(_dataset):
         plt.ylim(-0.636, -0.611)
         plt.xlim(0, runtime_limit+1000)
     elif _dataset == 'pokerhand':
-        plt.ylim(-1.0, -0.95)
+        plt.ylim(-1.001, -0.951)
         plt.xlim(0, runtime_limit+10)
     elif _dataset.startswith('HIGGS'):
-        plt.ylim(-0.7550, -0.7425)
+        plt.ylim(-0.756, -0.746)
         plt.xlim(0, runtime_limit+10)
+    elif _dataset.startswith('hepmass'):
+        plt.ylim(-0.8755, -0.8725)
+        plt.xlim(0, runtime_limit+10)
+    elif _dataset.startswith('censusincome'):
+        plt.ylim(-0.747, -0.737)
+        plt.xlim(0, runtime_limit)
 
 
 print('start', dataset)
@@ -164,7 +178,7 @@ for mth in mths:
     x, m, s = create_plot_points(stats, 0, runtime_limit, 10000)
     result[mth] = (x, m, s)
     # plot
-    plt.plot(x, m, lw=lw, label=get_mth_legend(mth),
+    plt.plot(x, m, lw=lw, label=get_mth_legend(mth, show_mode=True),
              color=color_dict[mth], marker=marker_dict[mth],
              markersize=markersize, markevery=markevery)
     #plt.fill_between(x, m - s * std_scale, m + s * std_scale, alpha=alpha, facecolor=color_dict[mth])

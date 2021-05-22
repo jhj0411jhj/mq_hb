@@ -163,7 +163,7 @@ def create_point(x, stats, default=0.0):
     return perf_list
 
 
-def create_plot_points(stats, start_time, end_time, point_num=500):
+def create_plot_points(stats, start_time, end_time, point_num=500, default=0.0):
     """
 
     :param stats:
@@ -171,12 +171,14 @@ def create_plot_points(stats, start_time, end_time, point_num=500):
     :param start_time:
     :param end_time:
     :param point_num:
+    :param default:
+        init value of perf
     :return:
     """
     x = np.linspace(start_time, end_time, num=point_num)
     _mean, _std = list(), list()
     for i, stage in enumerate(x):
-        perf_list = create_point(stage, stats)
+        perf_list = create_point(stage, stats, default)
         _mean.append(np.mean(perf_list))
         _std.append(np.std(perf_list))
     # Used to plot errorbar.

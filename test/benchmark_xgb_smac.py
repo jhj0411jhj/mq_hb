@@ -8,6 +8,7 @@ import os
 import sys
 import time
 import argparse
+import traceback
 import numpy as np
 import pickle as pkl
 from sklearn.metrics import balanced_accuracy_score
@@ -16,6 +17,7 @@ sys.path.insert(0, ".")
 sys.path.insert(1, "../open-box")    # for dependency
 from mq_hb.xgb_model import XGBoost
 from utils import load_data, setup_exp, check_datasets, seeds
+from benchmark_process_record import remove_partial, get_incumbent
 
 # default_datasets = 'mnist_784,higgs,covertype'
 default_datasets = 'covtype,codrna'
@@ -102,8 +104,19 @@ for dataset in test_datasets:
 
         dir_path = 'data/benchmark_xgb/%s-%d/%s/' % (dataset, runtime_limit, method_str)
         file_name = 'record_%s.pkl' % (method_id,)
-        if not os.path.exists(dir_path):
-            os.makedirs(dir_path)
+        try:
+            if not os.path.exists(dir_path):
+                os.makedirs(dir_path)
+        except FileExistsError:
+            pass
         with open(os.path.join(dir_path, file_name), 'wb') as f:
             pkl.dump(recorder, f)
         print(dir_path, file_name, 'saved!', flush=True)
+
+    try:
+        model_name = 'xgb'
+        mths = [method_str]
+        remove_partial(model_name, dataset, mths, runtime_limit, R=None)
+        get_incumbent(model_name, dataset, mths, runtime_limit)
+    except Exception as e:
+        print('benchmark process record failed: %s' % (traceback.format_exc(),))

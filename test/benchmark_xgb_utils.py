@@ -154,8 +154,11 @@ def run_exp(test_datasets, algo_class, algo_kwargs, algo_name, n_workers, parall
 
             dir_path = 'data/benchmark_xgb/%s-%d/%s/' % (dataset, runtime_limit, method_str)
             file_name = 'record_%s.pkl' % (method_id,)
-            if not os.path.exists(dir_path):
-                os.makedirs(dir_path)
+            try:
+                if not os.path.exists(dir_path):
+                    os.makedirs(dir_path)
+            except FileExistsError:
+                pass
             with open(os.path.join(dir_path, file_name), 'wb') as f:
                 pkl.dump(recorder, f)
             print(dir_path, file_name, 'saved!', flush=True)
