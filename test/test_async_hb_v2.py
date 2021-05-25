@@ -1,3 +1,66 @@
+"""
+example cmdline:
+
+python test/benchmark_xgb_async_hb_v2.py --datasets spambase --R 27 --n_jobs 4 --n_workers 1 \
+--skip_outer_loop 0 --runtime_limit 60 --rep 1 --start_id 0
+
+"""
+
+import os
+import sys
+import time
+import argparse
+import numpy as np
+import pickle as pkl
+
+sys.path.insert(0, ".")
+sys.path.insert(1, "../open-box")    # for dependency
+from mq_hb.async_mq_hb_v2 import async_mqHyperband_v2
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--datasets', type=str, default='')
+parser.add_argument('--R', type=int, default=27)
+parser.add_argument('--eta', type=int, default=3)
+parser.add_argument('--n_jobs', type=int, default=4)
+
+parser.add_argument('--skip_outer_loop', type=int, default=0)
+
+parser.add_argument('--ip', type=str, default='127.0.0.1')
+parser.add_argument('--port', type=int, default=0)
+parser.add_argument('--n_workers', type=int, default=4)        # must set
+
+parser.add_argument('--runtime_limit', type=int, default=60)
+parser.add_argument('--time_limit_per_trial', type=int, default=600)
+
+parser.add_argument('--rep', type=int, default=1)
+parser.add_argument('--start_id', type=int, default=0)
+
+args = parser.parse_args()
+test_datasets = args.datasets.split(',')
+print("datasets num=", len(test_datasets))
+R = args.R
+eta = args.eta
+n_jobs = args.n_jobs                                # changed according to dataset
+
+skip_outer_loop = args.skip_outer_loop
+
+ip = args.ip
+port = args.port
+n_workers = args.n_workers  # Caution: must set for saving result to different dirs
+
+runtime_limit = args.runtime_limit                  # changed according to dataset
+time_limit_per_trial = args.time_limit_per_trial    # changed according to dataset
+
+rep = args.rep
+start_id = args.start_id
+
+print(ip, port, n_jobs, n_workers, test_datasets)
+print(R, eta)
+print(runtime_limit)
+for para in (ip, port, n_jobs, R, eta, n_workers, runtime_limit):
+    assert para is not None
+
+
 import os
 import time
 import traceback
@@ -12,53 +75,19 @@ from mq_hb.mq_mf_worker import mqmfWorker
 from mq_hb.async_mq_mf_worker import async_mqmfWorker
 from mq_hb.xgb_model import XGBoost
 from utils import load_data, setup_exp, check_datasets, seeds
-from benchmark_process_record import remove_partial, get_incumbent
 
 
 def mf_objective_func(config, n_resource, extra_conf,
-                      total_resource, x_train, x_val, x_test, y_train, y_val, y_test,
+                      total_resource,
                       n_jobs, run_test=True):
-    print('objective extra conf:', extra_conf)
-    params = config.get_dictionary()
-
-    t0 = time.time()
-    # sample train data. the test data after split is sampled train data
-    if n_resource < total_resource:
-        ratio = n_resource / total_resource
-        print('sample data: ratio =', ratio, n_resource, total_resource)
-        _x, sample_x, _y, sample_y = train_test_split(x_train, y_train, test_size=ratio,
-                                                      stratify=y_train, random_state=1)
-    else:
-        print('sample data: use full dataset', n_resource, total_resource)
-        sample_x, sample_y = x_train, y_train
-    t1 = time.time()
-    print('sample time = %.2fs. resource=%f/%f.' % (t1 - t0, n_resource, total_resource))
-
-    model = XGBoost(**params, n_jobs=n_jobs, seed=47)
-    model.fit(sample_x, sample_y)
-
-    t2 = time.time()
-    print('train time = %.2fs. resource=%f/%f.' % (t2 - t1, n_resource, total_resource))
-
-    # evaluate on validation data
-    y_pred = model.predict(x_val)
-    perf = -balanced_accuracy_score(y_val, y_pred)  # minimize
-
-    t3 = time.time()
-    print('predict time = %.2fs.' % (t3 - t2))
-
-    test_perf = None
-    if run_test and n_resource == total_resource:
-        y_test_pred = model.predict(x_test)
-        test_perf = -balanced_accuracy_score(y_test, y_test_pred)  # minimize
-        t4 = time.time()
-        print('test time = %.2fs.' % (t4 - t3))
+    np.random.seed(int(time.time()*10000%10000))
+    perf = np.random.rand()
 
     result = dict(
         objective_value=perf,
         early_stop=False,  # for deep learning
         ref_id=None,
-        test_perf=test_perf,
+        test_perf=None,
     )
     return result
 
@@ -73,14 +102,11 @@ def evaluate_parallel(algo_class, algo_kwargs, method_id, n_workers, dataset, se
     if pre_sample and eta is None:
         raise ValueError('eta must not be None if pre_sample=True')
 
-    x_train, x_val, x_test, y_train, y_val, y_test = load_data(dataset)
 
     if pre_sample:
         raise NotImplementedError   # todo
     else:
         objective_function = partial(mf_objective_func, total_resource=R,
-                                     x_train=x_train, x_val=x_val, x_test=x_test,
-                                     y_train=y_train, y_val=y_val, y_test=y_test,
                                      n_jobs=n_jobs, run_test=run_test)
 
     def master_run(return_list, algo_class, algo_kwargs):
@@ -113,7 +139,7 @@ def evaluate_parallel(algo_class, algo_kwargs, method_id, n_workers, dataset, se
     master = Process(target=master_run, args=(recorder, algo_class, algo_kwargs))
     master.start()
 
-    time.sleep(10)  # wait for master init
+    time.sleep(2)  # wait for master init
     worker_pool = []
     for i in range(n_workers):
         worker = Process(target=worker_run, args=(i,))
@@ -130,7 +156,6 @@ def evaluate_parallel(algo_class, algo_kwargs, method_id, n_workers, dataset, se
 def run_exp(test_datasets, algo_class, algo_kwargs, algo_name, n_workers, parallel_strategy,
             R, n_jobs, runtime_limit, time_limit_per_trial, start_id, rep, ip, port,
             eta=None, pre_sample=False, run_test=True):
-    check_datasets(test_datasets)
     for dataset in test_datasets:
         # setup
         n_jobs, runtime_limit, time_limit_per_trial = setup_exp(dataset, n_jobs, runtime_limit, time_limit_per_trial)
@@ -144,6 +169,12 @@ def run_exp(test_datasets, algo_class, algo_kwargs, algo_name, n_workers, parall
             method_id = method_str + '-%s-%d-%s' % (dataset, seed, timestamp)
 
             # ip, port are filled in evaluate_parallel()
+            # def get_cs():  # test small space
+            #     from openbox.utils.config_space import ConfigurationSpace, UniformIntegerHyperparameter
+            #     cs = ConfigurationSpace()
+            #     max_depth = UniformIntegerHyperparameter("max_depth", 1, 1000)
+            #     cs.add_hyperparameters([max_depth])
+            #     return cs
             algo_kwargs['objective_func'] = None
             algo_kwargs['config_space'] = XGBoost.get_cs()
             algo_kwargs['random_state'] = seed
@@ -156,24 +187,18 @@ def run_exp(test_datasets, algo_class, algo_kwargs, algo_name, n_workers, parall
                 parallel_strategy, n_jobs, R, eta=eta, pre_sample=pre_sample, run_test=run_test,
             )
 
-            dir_path = 'data/benchmark_xgb/%s-%d/%s/' % (dataset, runtime_limit, method_str)
-            file_name = 'record_%s.pkl' % (method_id,)
-            try:
-                if not os.path.exists(dir_path):
-                    os.makedirs(dir_path)
-            except FileExistsError:
-                pass
-            with open(os.path.join(dir_path, file_name), 'wb') as f:
-                pkl.dump(recorder, f)
-            print(dir_path, file_name, 'saved!', flush=True)
 
-            if rep > 1 or len(test_datasets) > 1:
-                time.sleep(300)
+algo_name = 'ahbv2'
+algo_class = async_mqHyperband_v2
+# objective_func, config_space, random_state, method_id, runtime_limit, time_limit_per_trial, ip, port
+# are filled in run_exp()
+algo_kwargs = dict(
+    R=R, eta=eta,
+    skip_outer_loop=skip_outer_loop,
+    restart_needed=True,
+)
+parallel_strategy = 'async'
 
-        try:
-            model_name = 'xgb'
-            mths = [method_str]
-            remove_partial(model_name, dataset, mths, runtime_limit, R)
-            get_incumbent(model_name, dataset, mths, runtime_limit)
-        except Exception as e:
-            print('benchmark process record failed: %s' % (traceback.format_exc(),))
+run_exp(test_datasets, algo_class, algo_kwargs, algo_name, n_workers, parallel_strategy,
+        R, n_jobs, runtime_limit, time_limit_per_trial, start_id, rep, ip, port,
+        eta=eta, pre_sample=False, run_test=True)
