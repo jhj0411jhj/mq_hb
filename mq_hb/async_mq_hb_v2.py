@@ -142,6 +142,7 @@ class async_mqHyperband_v2(async_mqBaseFacade):
         # no waiting config, sample a new one
         if next_config is None:
             next_config, next_n_iteration, next_extra_conf = self.choose_next()
+            next_extra_conf['initial_run'] = True  # for loading from checkpoint in DL
             # update bracket
             bracket_id = self.get_bracket_id(self.brackets, next_n_iteration)
             self.logger.info('Sample a new config: %s. Add to bracket %d.' % (next_config, bracket_id))
@@ -197,6 +198,7 @@ class async_mqHyperband_v2(async_mqBaseFacade):
             next_config = config
             next_n_iteration = bracket[rung_id + 1]['n_iteration']
             next_extra_conf = extra_conf
+            next_extra_conf['initial_run'] = False  # for loading from checkpoint in DL
             # update bracket
             self.logger.info('Promote job in bracket %d rung %d: %s' %
                              (bracket_id, rung_id, bracket[rung_id]['jobs'][job_id]))

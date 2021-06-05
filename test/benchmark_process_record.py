@@ -96,6 +96,7 @@ if __name__ == '__main__':
     parser.add_argument('--R', type=int, default=27)
     parser.add_argument('--old', type=int)
     parser.add_argument('--new', type=int)
+    parser.add_argument('--model', type=str, default='xgb')
 
     args = parser.parse_args()
     dataset = args.dataset
@@ -103,7 +104,7 @@ if __name__ == '__main__':
     R = args.R
     old_runtime_limit = args.old
     new_runtime_limit = args.new
-    model = 'xgb'
+    model = args.model
     for para in (dataset, old_runtime_limit, new_runtime_limit):
         assert para is not None
 

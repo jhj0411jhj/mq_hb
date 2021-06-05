@@ -133,6 +133,7 @@ class mqMFES(mqBaseFacade):
 
             extra_info = None
             last_run_num = None
+            initial_run = True
 
             for i in range((s + 1) - int(skip_last)):  # changed from s + 1
 
@@ -150,7 +151,8 @@ class mqMFES(mqBaseFacade):
                 self.logger.info("%s: %d configurations x %d iterations each" %
                                  (self.method_name, int(n_configs), int(n_iteration)))
 
-                ret_val, early_stops = self.run_in_parallel(T, n_iter, extra_info)
+                ret_val, early_stops = self.run_in_parallel(T, n_iter, extra_info, initial_run)
+                initial_run = False
                 val_losses = [item['loss'] for item in ret_val]
                 ref_list = [item['ref_id'] for item in ret_val]
 

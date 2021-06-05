@@ -22,12 +22,13 @@ parser.add_argument('--dataset', type=str)
 parser.add_argument('--mths', type=str, default=default_mths)
 parser.add_argument('--R', type=int, default=27)
 parser.add_argument('--runtime_limit', type=int)    # if you don't want to use default setup
+parser.add_argument('--model', type=str, default='xgb')
 
 args = parser.parse_args()
 dataset = args.dataset
 mths = args.mths.split(',')
 R = args.R
-model = 'xgb'
+model = args.model
 
 
 def fetch_color_marker_old(m_list):

@@ -108,6 +108,7 @@ class async_mqSuccessiveHalving(async_mqBaseFacade):
                     next_config = config
                     next_n_iteration = self.bracket[rung_id + 1]['n_iteration']
                     next_extra_conf = extra_conf
+                    next_extra_conf['initial_run'] = False  # for loading from checkpoint in DL
                     # update bracket
                     self.logger.info('Promote job in rung %d: %s' % (rung_id, self.bracket[rung_id]['jobs'][job_id]))
                     self.bracket[rung_id]['jobs'][job_id][0] = PROMOTED
@@ -123,6 +124,7 @@ class async_mqSuccessiveHalving(async_mqBaseFacade):
         # no promotable config, sample a new one
         if next_config is None:
             next_config, next_n_iteration, next_extra_conf = self.choose_next()
+            next_extra_conf['initial_run'] = True   # for loading from checkpoint in DL
             # update bracket
             rung_id = self.get_rung_id(self.bracket, next_n_iteration)
             self.logger.info('Sample a new config: %s. Add to rung %d.' % (next_config, rung_id))

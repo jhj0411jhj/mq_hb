@@ -67,7 +67,7 @@ def evaluate_parallel(algo_class, algo_kwargs, method_id, n_workers, dataset, se
                       parallel_strategy, n_jobs, R, eta=None, pre_sample=False, run_test=True):
     print(method_id, n_workers, dataset, seed)
     if port == 0:
-        port = 13579 + np.random.randint(1000)
+        port = 13579 + np.random.RandomState(int(time.time() * 10000 % 10000)).randint(2000)
     print('ip=', ip, 'port=', port)
     assert parallel_strategy in ['sync', 'async']
     if pre_sample and eta is None:

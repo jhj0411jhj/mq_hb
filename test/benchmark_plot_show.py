@@ -88,16 +88,16 @@ def get_mth_legend(mth, show_mode=False):
         'bohb-n1': 'BOHB-n1',
         'mfes-n1': 'MFES-n1',
 
-        'random-n8': 'Random',
+        'random-n8': 'Random Search',
         'hyperband-n8': 'Hyperband',
         'bohb-n8': 'BOHB',
-        'mfes-n8': 'MFES',
+        'mfes-n8': 'MFES-HB',
     }
     if show_mode:
         if mth.startswith('amfes') and mth.endswith('-n8'):
-            mth = 'A-MFES'
+            mth = 'A-MFES-HB'
         if mth.startswith('mfes') and mth.endswith('-n8'):
-            mth = 'MFES'
+            mth = 'MFES-HB'
         legend_dict['ahb-n1'] = 'ASHA-n1'
         legend_dict['ahb-n8'] = 'ASHA'
         legend_dict['bohbv0-n1'] = 'BOHB-n1'
@@ -213,6 +213,12 @@ for mth in mths:
 
 
 def get_title(dataset):
+    if dataset == 'censusincome':
+        return 'Census Income'
+    if dataset == 'covtype':
+        return 'Covertype'
+    if dataset == 'pokerhand':
+        return 'Poker Hand'
     if dataset == 'HIGGS220w':
         return 'HIGGS'
     if dataset == 'hepmass210w':
@@ -221,10 +227,12 @@ def get_title(dataset):
 
 
 # show plot
+#print(plt.rcParams['figure.figsize'])
 plt.legend(loc='upper right')
-plt.title(get_title(dataset), fontsize=16)
+plt.title(get_title(dataset), fontsize=20)
 plt.xlabel("Wall Clock Time (s)", fontsize=16)
 plt.ylabel("Validation Error", fontsize=16)
+plt.grid()
 plt.tight_layout()
 #plt.show()
-plt.savefig('logs/amfes_%s_n8_20210518.png' % (dataset), dpi=250)
+plt.savefig('logs/amfes_%s_n8_20210530.png' % (dataset), dpi=250)

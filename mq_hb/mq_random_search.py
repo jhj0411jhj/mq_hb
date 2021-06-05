@@ -20,7 +20,8 @@ class mqRandomSearch(mqBaseFacade):
                  runtime_limit=None,
                  ip='',
                  port=13579,
-                 authkey=b'abc',):
+                 authkey=b'abc',
+                 **kwargs):
         max_queue_len = max(100, 3 * n_workers)  # conservative design
         super().__init__(objective_func, method_name=method_id,
                          restart_needed=restart_needed, time_limit_per_trial=time_limit_per_trial,
@@ -38,6 +39,7 @@ class mqRandomSearch(mqBaseFacade):
         self.best_config = None
         self.incumbent_configs = []
         self.incumbent_obj = []
+        self.logger.info('Unused kwargs: %s' % kwargs)
 
     def run(self):
         try:
@@ -59,7 +61,7 @@ class mqRandomSearch(mqBaseFacade):
     def iterate(self):
         configs = sample_configurations(self.config_space, self.n_workers)
         extra_info = None
-        ret_val, early_stops = self.run_in_parallel(configs, self.R, extra_info)
+        ret_val, early_stops = self.run_in_parallel(configs, self.R, extra_info, initial_run=True)
         val_losses = [item['loss'] for item in ret_val]
 
         self.incumbent_configs.extend(configs)

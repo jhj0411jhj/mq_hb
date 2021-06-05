@@ -15,7 +15,7 @@ import pickle as pkl
 
 sys.path.insert(0, ".")
 sys.path.insert(1, "../open-box")    # for dependency
-from mq_hb.async_mq_hb_v2 import async_mqHyperband_v2
+from mq_hb.async_mq_hb_v0 import async_mqHyperband_v0
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--datasets', type=str, default='')
@@ -188,8 +188,8 @@ def run_exp(test_datasets, algo_class, algo_kwargs, algo_name, n_workers, parall
             )
 
 
-algo_name = 'ahbv2'
-algo_class = async_mqHyperband_v2
+algo_name = 'ahbv0'
+algo_class = async_mqHyperband_v0
 # objective_func, config_space, random_state, method_id, runtime_limit, time_limit_per_trial, ip, port
 # are filled in run_exp()
 algo_kwargs = dict(

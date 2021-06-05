@@ -85,7 +85,7 @@ class mqBaseFacade(object):
         self._history['best_trial_id'].append(trial_id)
         self._history['configuration'].append(config)
 
-    def run_in_parallel(self, configurations, n_iteration, extra_info=None):
+    def run_in_parallel(self, configurations, n_iteration, extra_info=None, initial_run=True):
         n_configuration = len(configurations)
         performance_result = []
         early_stops = []
@@ -110,6 +110,7 @@ class mqBaseFacade(object):
                 extra_conf_dict['reference'] = extra_info[index]
             extra_conf_dict['need_lc'] = self.record_lc
             extra_conf_dict['method_name'] = self.method_name
+            extra_conf_dict['initial_run'] = initial_run    # for loading from checkpoint in DL
             conf_list.append((config, extra_conf_dict))
 
         # Add batch configs to masterQueue.
@@ -167,8 +168,11 @@ class mqBaseFacade(object):
         return performance_result, early_stops
 
     def set_save_intermediate_record(self, dir_path, file_name):
-        if not os.path.exists(dir_path):
-            os.makedirs(dir_path)
+        try:
+            if not os.path.exists(dir_path):
+                os.makedirs(dir_path)
+        except FileExistsError:
+            pass
         self.save_intermediate_record = True
         if file_name.endswith('.pkl'):
             file_name = file_name[:-4]
@@ -214,3 +218,6 @@ class mqBaseFacade(object):
         logger_name = name
         setup_logger(os.path.join(self.log_directory, '%s.log' % str(logger_name)), None)
         return get_logger(self.__class__.__name__)
+
+    def run(self):
+        raise NotImplementedError

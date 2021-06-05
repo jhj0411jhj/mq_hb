@@ -144,8 +144,11 @@ class async_mqBaseFacade(object):
         raise NotImplementedError
 
     def set_save_intermediate_record(self, dir_path, file_name):
-        if not os.path.exists(dir_path):
-            os.makedirs(dir_path)
+        try:
+            if not os.path.exists(dir_path):
+                os.makedirs(dir_path)
+        except FileExistsError:
+            pass
         self.save_intermediate_record = True
         if file_name.endswith('.pkl'):
             file_name = file_name[:-4]
