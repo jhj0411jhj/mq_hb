@@ -20,7 +20,7 @@ from mq_hb.utils import sample_configurations
 
 class RandomSampling(object):
 
-    def __init__(self, objective_function, config_space, n_samples=500, rng=None):
+    def __init__(self, objective_function, config_space, n_samples=5000, rng=None):
         """
         Samples candidates uniformly at random and returns the point with the highest objective value.
 
@@ -146,15 +146,10 @@ class async_mqBOHB(async_mqHyperband):
             # Update surrogate model in acquisition function.
             self.acquisition_function.update(model=self.surrogate, eta=std_incumbent_value,
                                              num_data=len(self.incumbent_configs))
-            sample_cnt = 0
-            max_sample_cnt = 1000
-            while True:
-                candidate = self.acq_optimizer.maximize(best_config=best_config, batch_size=1)[0]
-                sample_cnt += 1
+            candidates = self.acq_optimizer.maximize(best_config=best_config, batch_size=5000)
+            for candidate in candidates:
                 if candidate not in self.bracket[next_rung_id]['configs']:
                     next_config = candidate
-                    break
-                if sample_cnt >= max_sample_cnt:
                     break
             if next_config is None:
                 self.logger.warning('Cannot get a non duplicate configuration from bo candidates. '
