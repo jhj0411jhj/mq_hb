@@ -1,7 +1,7 @@
 """
 example cmdline:
 
-python test/nas_benchmarks/benchmark_nasbench101.py --mths hyperband --R 27 --n_workers 4 --runtime_limit 86400 --rep 1 --start_id 0
+python test/nas_benchmarks/benchmark_nasbench201.py --dataset cifar10-valid --mths hyperband --R 27 --n_workers 4 --runtime_limit 86400 --rep 1 --start_id 0
 
 """
 
@@ -16,7 +16,7 @@ from functools import partial
 
 sys.path.insert(0, ".")
 sys.path.insert(1, "../open-box")    # for dependency
-from test.nas_benchmarks.nasbench101_utils import load_nasbench101, get_nasbench101_configspace, objective_func
+from test.nas_benchmarks.nasbench201_utils import load_nasbench201, get_nasbench201_configspace, objective_func
 from test.nas_benchmarks.simulation_utils import run_in_parallel, run_async
 from test.utils import seeds, timeit
 from test.benchmark_process_record import remove_partial, get_incumbent
@@ -68,21 +68,20 @@ mth_dict = dict(
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--mths', type=str, default='hyperband')
-# parser.add_argument('--datasets', type=str, default='cifar10')
+parser.add_argument('--dataset', type=str, default='cifar10-valid')
 parser.add_argument('--R', type=int, default=27)
 parser.add_argument('--eta', type=int, default=3)
 parser.add_argument('--n_workers', type=int)        # must set
-parser.add_argument('--runtime_limit', type=int, default=432000)
+parser.add_argument('--runtime_limit', type=int, default=86400)
 parser.add_argument('--time_limit_per_trial', type=int, default=999999)
 parser.add_argument('--rep', type=int, default=1)
 parser.add_argument('--start_id', type=int, default=0)
-parser.add_argument('--data_path', type=str, default='../nas_data/nasbench_full.tfrecord')
+parser.add_argument('--data_path', type=str, default='../nas_data/NAS-Bench-201-v1_1-096897.pth')
 
 args = parser.parse_args()
 mths = args.mths.split(',')
 print("mths:", mths)
-# test_datasets = args.datasets.split(',')
-# print("datasets num=", len(test_datasets))
+dataset = args.dataset
 R = args.R
 eta = args.eta
 n_workers = args.n_workers  # Caution: must set for saving result to different dirs
@@ -145,14 +144,13 @@ def evaluate_simulation(algo_class, algo_kwargs, method_id, n_workers, seed, par
     return algo.recorder
 
 
-with timeit('load nasbench101'):
-    model_name = 'nasbench101'
-    dataset = 'cifar10'
-    cs = get_nasbench101_configspace()
-    nasbench = load_nasbench101(path=data_path)
-    objective_function = partial(objective_func, total_resource=R, eta=eta, nasbench=nasbench)
+with timeit('load nasbench201'):
+    model_name = 'nasbench201'
+    cs = get_nasbench201_configspace()
+    api = load_nasbench201(path=data_path)
+    objective_function = partial(objective_func, total_resource=R, eta=eta, api=api, dataset=dataset)
 
-with timeit('all'):
+with timeit('%s all' % dataset):
     for algo_name in mths:
         with timeit('%s %d %d' % (algo_name, start_id, rep)):
             algo_class, parallel_strategy = mth_dict[algo_name]

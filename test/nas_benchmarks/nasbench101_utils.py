@@ -11,6 +11,7 @@ CONV3X3 = 'conv3x3-bn-relu'
 MAXPOOL3X3 = 'maxpool3x3'
 
 VALID_EPOCHS = {4, 12, 36, 108}
+MAX_EPOCHS = 108
 EDGE_NUM = 21
 OP_NUM = 5
 NASBENCH101_REPEAT_NUM = 3
@@ -88,7 +89,7 @@ def parse_metric(computed_metrics, epochs):
 def objective_func(config, n_resource, extra_conf, total_resource, eta, nasbench):
     assert total_resource == 27 and eta == 3
     print('objective extra conf:', extra_conf)
-    epochs = int(108 * n_resource / total_resource)
+    epochs = int(MAX_EPOCHS * n_resource / total_resource)
     assert epochs in VALID_EPOCHS, 'error epochs %d' % epochs
 
     # convert config to modelspec
@@ -109,10 +110,11 @@ def objective_func(config, n_resource, extra_conf, total_resource, eta, nasbench
     train_time, val_perf, test_perf = parse_metric(computed_metrics, epochs)
 
     # Get checkpoint metrics
-    if epochs == 4:
+    if extra_conf['initial_run']:
         last_train_time = 0.0
     else:
-        last_epochs = int(epochs / eta)
+        last_epochs = int(MAX_EPOCHS * (n_resource / eta) / total_resource)
+        assert last_epochs in VALID_EPOCHS, 'error last_epochs %d' % last_epochs
         last_train_time, _, _ = parse_metric(computed_metrics, last_epochs)
 
     # restore from checkpoint
@@ -137,5 +139,6 @@ if __name__ == '__main__':
         nasbench = load_nasbench101(path='./nas_data/nasbench_full.tfrecord')
         conf = cs.sample_configuration()
         print(conf)
-        result = objective_func(conf, n_resource=3, extra_conf={}, total_resource=27, eta=3, nasbench=nasbench)
+        extra_conf = dict(initial_run=True)
+        result = objective_func(conf, n_resource=3, extra_conf=extra_conf, total_resource=27, eta=3, nasbench=nasbench)
         print(result)
