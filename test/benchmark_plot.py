@@ -170,6 +170,9 @@ def plot_setup(_dataset):
     elif _dataset.startswith('censusincome'):
         plt.ylim(-0.747, -0.737)
         plt.xlim(0, runtime_limit)
+    elif _dataset == 'cifar10-valid':
+        plt.ylim(-91.62, -91.22)
+        plt.xlim(0, runtime_limit)
 
 
 print('start', dataset)
@@ -198,9 +201,9 @@ for mth in mths:
                 raw_recorder = pkl.load(f)
             recorder = []
             for record in raw_recorder:
-                if record.get('n_iteration') is not None and record['n_iteration'] < R:
-                    print('error abandon record by n_iteration:', R, mth, record)
-                    continue
+                # if record.get('n_iteration') is not None and record['n_iteration'] < R:
+                #     print('error abandon record by n_iteration:', R, mth, record)
+                #     continue
                 if record['global_time'] > runtime_limit:
                     print('abandon record by runtime_limit:', runtime_limit, mth, record)
                     continue

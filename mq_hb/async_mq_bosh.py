@@ -2,7 +2,7 @@ import os
 import time
 import numpy as np
 
-from mq_hb.async_mq_hb import async_mqHyperband
+from mq_hb.async_mq_sh import async_mqSuccessiveHalving
 from mq_hb.utils import RUNNING, COMPLETED, PROMOTED
 from mq_hb.utils import sample_configuration
 from mq_hb.utils import minmax_normalization, std_normalization
@@ -68,28 +68,27 @@ class RandomSampling(object):
         return candidates
 
 
-class async_mqBOHB(async_mqHyperband):
+class async_mqBOSH(async_mqSuccessiveHalving):
     """
-    The implementation of Asynchronous BOHB (combine ASHA and BOHB)
-    no median imputation!
+    The implementation of Asynchronous BOSH (combine ASHA and BOHB)
+    no Hyperband
     """
 
     def __init__(self, objective_func,
                  config_space: ConfigurationSpace,
                  R,
                  eta=3,
-                 skip_outer_loop=0,
                  rand_prob=0.3,
                  bo_init_num=3,
                  random_state=1,
-                 method_id='mqAsyncBOHB',
+                 method_id='mqAsyncBOSH',
                  restart_needed=True,
                  time_limit_per_trial=600,
                  runtime_limit=None,
                  ip='',
                  port=13579,
                  authkey=b'abc'):
-        super().__init__(objective_func, config_space, R, eta=eta, skip_outer_loop=skip_outer_loop,
+        super().__init__(objective_func, config_space, R, eta=eta,
                          random_state=random_state, method_id=method_id, restart_needed=restart_needed,
                          time_limit_per_trial=time_limit_per_trial, runtime_limit=runtime_limit,
                          ip=ip, port=port, authkey=authkey)
@@ -127,10 +126,10 @@ class async_mqBOHB(async_mqHyperband):
 
     def choose_next(self):
         """
-        sample a config according to BOHB. give iterations according to Hyperband strategy.
+        sample a config according to BO.
         """
         next_config = None
-        next_n_iteration = self.get_next_n_iteration()
+        next_n_iteration = self.bracket[0]['n_iteration']
         next_rung_id = self.get_rung_id(self.bracket, next_n_iteration)
 
         # sample config

@@ -9,6 +9,8 @@ from resnet_model import get_estimator
 from resnet_util import get_path_by_config, get_transforms
 from resnet_dataset import ImageDataset
 
+from openbox.utils.constants import MAXINT
+
 # Constant
 max_epoch = 200
 scorer = accuracy_scorer
@@ -63,7 +65,7 @@ def mf_objective_func_gpu(config, n_resource, extra_conf, device, total_resource
     except Exception as e:
         import traceback
         traceback.print_exc()
-        score = -np.inf
+        score = -MAXINT
     print('Evaluation | Score: %.4f | Time cost: %.2f seconds' %
           (scorer._sign * score,
            time.time() - start_time))

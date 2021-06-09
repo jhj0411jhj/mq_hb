@@ -20,51 +20,7 @@ from test.nas_benchmarks.nasbench101_utils import load_nasbench101, get_nasbench
 from test.nas_benchmarks.simulation_utils import run_in_parallel, run_async
 from test.utils import seeds, timeit
 from test.benchmark_process_record import remove_partial, get_incumbent
-from mq_hb.mq_random_search import mqRandomSearch
-from mq_hb.mq_sh import mqSuccessiveHalving
-from mq_hb.mq_hb import mqHyperband
-from mq_hb.mq_bohb import mqBOHB
-from mq_hb.mq_bohb_v0 import mqBOHB_v0
-from mq_hb.mq_mfes import mqMFES
-from mq_hb.mq_mfes_v4 import mqMFES_v4
-from mq_hb.async_mq_sh import async_mqSuccessiveHalving
-from mq_hb.async_mq_sh_v0 import async_mqSuccessiveHalving_v0
-from mq_hb.async_mq_sh_v2 import async_mqSuccessiveHalving_v2
-from mq_hb.async_mq_hb import async_mqHyperband
-from mq_hb.async_mq_hb_v0 import async_mqHyperband_v0
-from mq_hb.async_mq_hb_v2 import async_mqHyperband_v2
-from mq_hb.async_mq_weight_hb import async_mqWeightHyperband
-from mq_hb.async_mq_bohb import async_mqBOHB
-from mq_hb.async_mq_mfes_v3 import async_mqMFES_v3
-from mq_hb.async_mq_mfes_v6 import async_mqMFES_v6
-from mq_hb.async_mq_mfes_v12 import async_mqMFES_v12
-from mq_hb.async_mq_mfes_v13 import async_mqMFES_v13
-from mq_hb.async_mq_mfes_v14 import async_mqMFES_v14
-from mq_hb.async_mq_mfes_v15 import async_mqMFES_v15
-
-mth_dict = dict(
-    random=(mqRandomSearch, 'sync'),
-    sh=(mqSuccessiveHalving, 'sync'),
-    hyperband=(mqHyperband, 'sync'),
-    bohb=(mqBOHB, 'sync'),
-    bohbv0=(mqBOHB_v0, 'sync'),
-    mfes=(mqMFES, 'sync'),
-    mfesv4=(mqMFES_v4, 'sync'),
-    asha=(async_mqSuccessiveHalving, 'async'),
-    ashav0=(async_mqSuccessiveHalving_v0, 'async'),
-    ashav2=(async_mqSuccessiveHalving_v2, 'async'),
-    ahb=(async_mqHyperband, 'async'),
-    ahbv0=(async_mqHyperband_v0, 'async'),
-    ahbv2=(async_mqHyperband_v2, 'async'),
-    aweighthb=(async_mqWeightHyperband, 'async'),
-    abohb=(async_mqBOHB, 'async'),
-    amfesv3=(async_mqMFES_v3, 'async'),
-    amfesv6=(async_mqMFES_v6, 'async'),
-    amfesv12=(async_mqMFES_v12, 'async'),
-    amfesv13=(async_mqMFES_v13, 'async'),
-    amfesv14=(async_mqMFES_v14, 'async'),
-    amfesv15=(async_mqMFES_v15, 'async'),
-)
+from mq_hb import mth_dict
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--mths', type=str, default='hyperband')
@@ -72,7 +28,7 @@ parser.add_argument('--mths', type=str, default='hyperband')
 parser.add_argument('--R', type=int, default=27)
 parser.add_argument('--eta', type=int, default=3)
 parser.add_argument('--n_workers', type=int)        # must set
-parser.add_argument('--runtime_limit', type=int, default=432000)
+parser.add_argument('--runtime_limit', type=int, default=172800)
 parser.add_argument('--time_limit_per_trial', type=int, default=999999)
 parser.add_argument('--rep', type=int, default=1)
 parser.add_argument('--start_id', type=int, default=0)
@@ -162,7 +118,10 @@ with timeit('all'):
                 seed = seeds[i]
 
                 timestamp = time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime(time.time()))
-                method_str = '%s-n%d' % (algo_name, n_workers)
+                if R != 27:
+                    method_str = '%s-%d-n%d' % (algo_name, R, n_workers)
+                else:
+                    method_str = '%s-n%d' % (algo_name, n_workers)
                 method_id = method_str + '-%s-%d-%s' % (dataset, seed, timestamp)
 
                 algo_kwargs = dict()

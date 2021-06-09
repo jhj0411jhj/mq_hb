@@ -10,8 +10,7 @@ from mq_hb.mq_mf_worker_gpu import mqmfWorker_gpu
 from mq_hb.async_mq_mf_worker_gpu import async_mqmfWorker_gpu
 from test.utils import setup_exp, seeds
 from test.benchmark_process_record import remove_partial, get_incumbent
-from resnet_obj import mf_objective_func_gpu
-from resnet_model import ResNet32Classifier
+from lstm_obj import get_corpus, get_lstm_configspace, mf_objective_func_gpu
 
 
 def evaluate_parallel(algo_class, algo_kwargs, method_id, n_workers, dataset, seed, ip, port,
@@ -27,9 +26,12 @@ def evaluate_parallel(algo_class, algo_kwargs, method_id, n_workers, dataset, se
     print('ip=', ip, 'port=', port)
     assert parallel_strategy in ['sync', 'async']
 
-    model_dir = os.path.join('./data/resnet_save_models', method_id)
+    data_path = './test/awd-lstm-lm/data/penn'
+    corpus = get_corpus(data_path)
+
+    model_dir = os.path.join('./data/lstm_save_models', method_id)
     objective_function_gpu = partial(mf_objective_func_gpu, total_resource=R, run_test=run_test,
-                                     model_dir=model_dir, eta=eta)
+                                     model_dir=model_dir, eta=eta, corpus=corpus)
 
     def master_run(return_list, algo_class, algo_kwargs):
         algo_kwargs['ip'] = ''
@@ -84,8 +86,8 @@ def run_exp(dataset, algo_class, algo_kwargs, algo_name, n_workers, parallel_str
             R, n_jobs, runtime_limit, time_limit_per_trial, start_id, rep, ip, port,
             eta=3, pre_sample=False, run_test=False):
     # n_jobs / pre_sample are ignored
-    assert dataset == 'cifar10'
-    model = 'resnet'
+    assert dataset == 'penn'
+    model = 'lstm'
 
     # setup
     print('===== start eval %s: rep=%d, n_jobs=%d, runtime_limit=%d, time_limit_per_trial=%d'
@@ -99,7 +101,7 @@ def run_exp(dataset, algo_class, algo_kwargs, algo_name, n_workers, parallel_str
 
         # ip, port are filled in evaluate_parallel()
         algo_kwargs['objective_func'] = None
-        algo_kwargs['config_space'] = ResNet32Classifier.get_hyperparameter_search_space()
+        algo_kwargs['config_space'] = get_lstm_configspace()
         algo_kwargs['random_state'] = seed
         algo_kwargs['method_id'] = method_id
         algo_kwargs['runtime_limit'] = runtime_limit
