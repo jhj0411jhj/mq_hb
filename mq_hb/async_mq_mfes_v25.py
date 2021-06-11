@@ -10,6 +10,7 @@ from mq_hb.utils import RUNNING, COMPLETED, PROMOTED
 from mq_hb.utils import sample_configuration
 from mq_hb.utils import minmax_normalization, std_normalization
 from mq_hb.surrogate.rf_ensemble import RandomForestEnsemble
+from mq_hb.acq_maximizer.ei_optimization import RandomSampling
 
 from openbox.utils.util_funcs import get_types
 from openbox.utils.config_space import ConfigurationSpace
@@ -116,7 +117,6 @@ class async_mqMFES_v25(async_mqHyperband):
         self.random_configuration_chooser = ChooserProb(prob=rand_prob, rng=self.rng)
         self.random_check_idx = 0
 
-        from mq_hb.async_mq_bohb import RandomSampling
         self.acq_optimizer = RandomSampling(self.acquisition_function, config_space,
                                             n_samples=max(5000, 50 * len(bounds)))
 
@@ -429,8 +429,11 @@ class async_mqMFES_v25(async_mqHyperband):
             if new_last_weight < old_last_weight:
                 old_remain_weight = 1.0 - old_last_weight
                 new_remain_weight = 1.0 - new_last_weight
-                adjusted_new_weights = np.append(new_weights[:-1] / new_remain_weight * old_remain_weight,
-                                                 old_last_weight)
+                if new_remain_weight <= 1e-8:
+                    adjusted_new_weights = np.array([0.] * self.s_max + [1.], dtype=np.float64)
+                else:
+                    adjusted_new_weights = np.append(new_weights[:-1] / new_remain_weight * old_remain_weight,
+                                                     old_last_weight)
                 self.logger.info('[%s] %d-th. non_decreasing_weight: old_weights=%s, new_weights=%s, '
                                  'adjusted_new_weights=%s.' % (self.weight_method, self.weight_changed_cnt,
                                                                old_weights, new_weights, adjusted_new_weights))
@@ -442,8 +445,11 @@ class async_mqMFES_v25(async_mqHyperband):
             new_last_weight = a / (a + np.e ** (-(len(test_y) - s) * k))
             new_remain_weight = 1.0 - new_last_weight
             remain_weight = 1.0 - new_weights[-1]
-            adjusted_new_weights = np.append(new_weights[:-1] / remain_weight * new_remain_weight,
-                                             new_last_weight)
+            if remain_weight <= 1e-8:
+                adjusted_new_weights = np.array([0.] * self.s_max + [1.], dtype=np.float64)
+            else:
+                adjusted_new_weights = np.append(new_weights[:-1] / remain_weight * new_remain_weight,
+                                                 new_last_weight)
             self.logger.info('[%s] %d-th. increasing_weight: new_weights=%s, adjusted_new_weights=%s.'
                              % (self.weight_method, self.weight_changed_cnt, new_weights, adjusted_new_weights))
             new_weights = adjusted_new_weights

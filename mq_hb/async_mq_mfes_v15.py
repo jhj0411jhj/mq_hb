@@ -216,7 +216,7 @@ class async_mqMFES_v15(async_mqHyperband_v2):
         """
         choose next_n_iteration according to weights
         """
-        if self.use_weight_init and len(self.incumbent_configs) >= 2 * 8:  # todo: replace 8 by full observation num
+        if self.use_weight_init and len(self.incumbent_configs) >= 3 * 8:  # todo: replace 8 by full observation num
             weights = np.asarray(self.hist_weights_unadjusted[-1])     # caution the order of weights
             choose_weights = weights * self.n_init_configs
             choose_weights = choose_weights / np.sum(choose_weights)
@@ -365,8 +365,11 @@ class async_mqMFES_v15(async_mqHyperband_v2):
             if new_last_weight < old_last_weight:
                 old_remain_weight = 1.0 - old_last_weight
                 new_remain_weight = 1.0 - new_last_weight
-                adjusted_new_weights = np.append(new_weights[:-1] / new_remain_weight * old_remain_weight,
-                                                 old_last_weight)
+                if new_remain_weight <= 1e-8:
+                    adjusted_new_weights = np.array([0.] * self.s_max + [1.], dtype=np.float64)
+                else:
+                    adjusted_new_weights = np.append(new_weights[:-1] / new_remain_weight * old_remain_weight,
+                                                     old_last_weight)
                 self.logger.info('[%s] %d-th. non_decreasing_weight: old_weights=%s, new_weights=%s, '
                                  'adjusted_new_weights=%s.' % (self.weight_method, self.weight_changed_cnt,
                                                                old_weights, new_weights, adjusted_new_weights))

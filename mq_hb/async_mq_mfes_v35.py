@@ -10,6 +10,7 @@ from mq_hb.utils import RUNNING, COMPLETED, PROMOTED
 from mq_hb.utils import sample_configuration
 from mq_hb.utils import minmax_normalization, std_normalization
 from mq_hb.surrogate.rf_ensemble import RandomForestEnsemble
+from mq_hb.acq_maximizer.ei_optimization import RandomSampling
 
 from openbox.utils.util_funcs import get_types
 from openbox.utils.config_space import ConfigurationSpace
@@ -21,7 +22,7 @@ from openbox.utils.config_space.util import convert_configurations_to_array
 from openbox.utils.history_container import HistoryContainer
 
 
-class async_mqMFES_v13(async_mqHyperband):
+class async_mqMFES_v35(async_mqHyperband):
     """
     The implementation of Asynchronous MFES (combine ASHA and MFES)
     before fix
@@ -31,6 +32,13 @@ class async_mqMFES_v13(async_mqHyperband):
     === from v6
     v13: choose n_iteration of new config by unadjusted weight (random choice)
          update_weight when update_observation
+
+    === from v32 weight_method='rank_loss_prob' optimizer=localrandom
+    === exp version : test weight init
+    use_weight_init=True
+    update_weight when update_observation
+    non_decreasing_weight=False, increasing_weight=True
+    v35: softmax probability (top 2)
     """
 
     def __init__(self, objective_func,
@@ -41,10 +49,11 @@ class async_mqMFES_v13(async_mqHyperband):
                  rand_prob=0.3,
                  use_weight_init=True,
                  init_weight=None, update_enable=True,
-                 weight_method='rank_loss_p_norm',
+                 weight_method='rank_loss_prob',
                  fusion_method='idp',
                  power_num=3,
-                 non_decreasing_weight=True,
+                 non_decreasing_weight=False,
+                 increasing_weight=True,
                  random_state=1,
                  method_id='mqAsyncMFES',
                  restart_needed=True,
@@ -110,6 +119,8 @@ class async_mqMFES_v13(async_mqHyperband):
         self.random_check_idx = 0
 
         self.non_decreasing_weight = non_decreasing_weight
+        self.increasing_weight = increasing_weight
+        assert not (self.non_decreasing_weight and self.increasing_weight)
         self.use_weight_init = use_weight_init
         self.n_init_configs = np.array(
             [len(init_iter_list) for init_iter_list in self.hb_bracket_list],
@@ -245,16 +256,24 @@ class async_mqMFES_v13(async_mqHyperband):
         choose next_n_iteration according to weights
         """
         if self.use_weight_init and len(self.incumbent_configs) >= 3 * 8:  # todo: replace 8 by full observation num
-            weights = np.asarray(self.hist_weights_unadjusted[-1])     # caution the order of weights
-            choose_weights = weights * self.n_init_configs
-            choose_weights = choose_weights / np.sum(choose_weights)
+            power_num = 3
+            top_k = 2
+            new_weights = self.hist_weights_unadjusted[-1]
+            choose_weights = np.array(new_weights, dtype=np.float64) ** power_num
+            choose_weights[-1] = 0.
+            top_idx = np.argsort(choose_weights)[::-1][:top_k]
+            # retain top k weights
+            for i in range(len(choose_weights)):
+                if i not in top_idx:
+                    choose_weights[i] = 0.
+            weight_sum = np.sum(choose_weights)
+            if weight_sum <= 1e-8:
+                choose_weights = np.array([1. / self.s_max] * self.s_max + [0.], dtype=np.float64)
+            else:
+                choose_weights = choose_weights / weight_sum
             next_n_iteration = self.rng.choice(self.iterate_r, p=choose_weights)
-            self.logger.info('random choosing next_n_iteration=%d. unadjusted_weights: %s. '
-                             'n_init_configs: %s. choose_weights: %s.'
-                             % (next_n_iteration, weights, self.n_init_configs, choose_weights))
-            if choose_weights[-1] > 1 / self.s_max:
-                self.logger.warning('Caution: choose_weight of full init resource (%f) is too large!'
-                                    % (choose_weights[-1],))
+            self.logger.info('random choosing next_n_iteration=%d. new_weights: %s. choose_weights: %s.'
+                             % (next_n_iteration, new_weights, choose_weights))
             return next_n_iteration
 
         return super().get_next_n_iteration()
@@ -402,6 +421,21 @@ class async_mqMFES_v13(async_mqHyperband):
                                  'adjusted_new_weights=%s.' % (self.weight_method, self.weight_changed_cnt,
                                                                old_weights, new_weights, adjusted_new_weights))
                 new_weights = adjusted_new_weights
+        elif self.increasing_weight and len(test_y) >= 10:
+            s = 10
+            k = 0.025
+            a = 0.5
+            new_last_weight = a / (a + np.e ** (-(len(test_y) - s) * k))
+            new_remain_weight = 1.0 - new_last_weight
+            remain_weight = 1.0 - new_weights[-1]
+            if remain_weight <= 1e-8:
+                adjusted_new_weights = np.array([0.] * self.s_max + [1.], dtype=np.float64)
+            else:
+                adjusted_new_weights = np.append(new_weights[:-1] / remain_weight * new_remain_weight,
+                                                 new_last_weight)
+            self.logger.info('[%s] %d-th. increasing_weight: new_weights=%s, adjusted_new_weights=%s.'
+                             % (self.weight_method, self.weight_changed_cnt, new_weights, adjusted_new_weights))
+            new_weights = adjusted_new_weights
 
         self.logger.info('[%s] %d-th Updating weights: %s' % (
             self.weight_method, self.weight_changed_cnt, str(new_weights)))

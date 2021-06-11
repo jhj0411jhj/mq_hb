@@ -28,7 +28,7 @@ parser.add_argument('--ip', type=str, default='127.0.0.1')
 parser.add_argument('--port', type=int, default=0)
 parser.add_argument('--n_workers', type=int)        # must set
 
-parser.add_argument('--runtime_limit', type=int, default=86400)
+parser.add_argument('--runtime_limit', type=int, default=172800)
 parser.add_argument('--time_limit_per_trial', type=int, default=999999)
 
 parser.add_argument('--rep', type=int, default=1)

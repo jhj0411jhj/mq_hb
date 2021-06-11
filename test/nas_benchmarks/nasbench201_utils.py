@@ -45,10 +45,10 @@ def objective_func(config, n_resource, extra_conf, total_resource, eta, api, dat
         test_perf = None
     elif dataset == 'cifar100':
         val_perf = info['valtest-accuracy']
-        test_perf = None
+        test_perf = info.get('test-accuracy', None)
     elif dataset == 'ImageNet16-120':
         val_perf = info['valtest-accuracy']
-        test_perf = None
+        test_perf = info.get('test-accuracy', None)
     else:
         raise ValueError
 

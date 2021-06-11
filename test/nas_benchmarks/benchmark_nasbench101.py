@@ -28,7 +28,7 @@ parser.add_argument('--mths', type=str, default='hyperband')
 parser.add_argument('--R', type=int, default=27)
 parser.add_argument('--eta', type=int, default=3)
 parser.add_argument('--n_workers', type=int)        # must set
-parser.add_argument('--runtime_limit', type=int, default=172800)
+parser.add_argument('--runtime_limit', type=int, default=86400)
 parser.add_argument('--time_limit_per_trial', type=int, default=999999)
 parser.add_argument('--rep', type=int, default=1)
 parser.add_argument('--start_id', type=int, default=0)

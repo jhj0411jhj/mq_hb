@@ -23,12 +23,14 @@ parser.add_argument('--mths', type=str, default=default_mths)
 parser.add_argument('--R', type=int, default=27)
 parser.add_argument('--runtime_limit', type=int)    # if you don't want to use default setup
 parser.add_argument('--model', type=str, default='xgb')
+parser.add_argument('--default_value', type=float, default=0.0)
 
 args = parser.parse_args()
 dataset = args.dataset
 mths = args.mths.split(',')
 R = args.R
 model = args.model
+default_value = args.default_value
 
 
 def fetch_color_marker_old(m_list):
@@ -171,7 +173,13 @@ def plot_setup(_dataset):
         plt.ylim(-0.747, -0.737)
         plt.xlim(0, runtime_limit)
     elif _dataset == 'cifar10-valid':
-        plt.ylim(-91.62, -91.22)
+        plt.ylim(-91.65, -90.85)
+        plt.xlim(0, runtime_limit)
+    elif _dataset == 'cifar100':
+        plt.ylim(-73.7, -70.7)
+        plt.xlim(0, runtime_limit)
+    elif _dataset == 'ImageNet16-120':
+        plt.ylim(-47.0, -45.0)
         plt.xlim(0, runtime_limit)
 
 
@@ -217,7 +225,7 @@ for mth in mths:
             # for debugging
             # if mth == 'smac':
             #     plt.plot(timestamp, perf, label=file)
-    x, m, s = create_plot_points(stats, 0, runtime_limit, point_num=point_num, default=0.0)
+    x, m, s = create_plot_points(stats, 0, runtime_limit, point_num=point_num, default=default_value)
     result[mth] = (x, m, s)
     # plot
     plt.plot(x, m, lw=lw, label=get_mth_legend(mth, show_mode=False),
@@ -253,6 +261,20 @@ for mth in mths:
                 break
         speedup = baseline_time / mth_time
         print("%s %s %.2f" % (mth, baseline, speedup))
+
+# print last val perf
+print('===== mth - last val perf =====')
+for mth in mths:
+    x, m, s = result[mth]
+    m = m[-1]
+    s = s[-1]
+    perfs = None
+    if dataset == 'kuaishou1':
+        print(dataset, mth, perfs, u'%.5f\u00B1%.5f' % (m, s))
+    elif dataset in ['cifar10', 'cifar10-valid', 'cifar100', 'ImageNet16-120']:
+        print(dataset, mth, perfs, u'%.2f\u00B1%.2f' % (m, s))
+    else:
+        print(dataset, mth, perfs, u'%.4f\u00B1%.4f' % (m, s))
 
 # plt.axhline(-0.849296, linestyle="--", color="b", lw=1, label="Default")
 # plt.ylim(-0.863, -0.844)

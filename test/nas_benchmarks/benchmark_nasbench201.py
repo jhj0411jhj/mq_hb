@@ -22,13 +22,14 @@ from test.utils import seeds, timeit
 from test.benchmark_process_record import remove_partial, get_incumbent
 from mq_hb import mth_dict
 
+dataset_choices = ['cifar10-valid', 'cifar10', 'cifar100', 'ImageNet16-120']
 parser = argparse.ArgumentParser()
 parser.add_argument('--mths', type=str, default='hyperband')
-parser.add_argument('--dataset', type=str, default='cifar10-valid')
+parser.add_argument('--dataset', type=str, default='cifar10-valid', choices=dataset_choices)
 parser.add_argument('--R', type=int, default=27)
 parser.add_argument('--eta', type=int, default=3)
 parser.add_argument('--n_workers', type=int)        # must set
-parser.add_argument('--runtime_limit', type=int, default=86400)
+parser.add_argument('--runtime_limit', type=int, default=0)
 parser.add_argument('--time_limit_per_trial', type=int, default=999999)
 parser.add_argument('--rep', type=int, default=1)
 parser.add_argument('--start_id', type=int, default=0)
@@ -42,6 +43,15 @@ R = args.R
 eta = args.eta
 n_workers = args.n_workers  # Caution: must set for saving result to different dirs
 runtime_limit = args.runtime_limit
+if runtime_limit == 0:
+    if dataset in ['cifar10', 'cifar10-valid']:
+        runtime_limit = 86400
+    elif dataset == 'cifar100':
+        runtime_limit = 172800
+    elif dataset == 'ImageNet16-120':
+        runtime_limit = 432000
+    else:
+        raise ValueError
 time_limit_per_trial = args.time_limit_per_trial
 rep = args.rep
 start_id = args.start_id

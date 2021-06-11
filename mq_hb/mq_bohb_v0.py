@@ -1,64 +1,13 @@
 from openbox.utils.config_space import ConfigurationSpace
 from mq_hb.mq_hb import mqHyperband
 from mq_hb.utils import sample_configurations, expand_configurations
+from mq_hb.acq_maximizer.ei_optimization import RandomSampling
 
 import numpy as np
 from openbox.utils.util_funcs import get_types
 from openbox.acquisition_function.acquisition import EI
 from openbox.surrogate.base.rf_with_instances import RandomForestWithInstances
 from openbox.utils.config_space.util import convert_configurations_to_array
-from openbox.utils.config_space import get_one_exchange_neighbourhood
-from openbox.utils.constants import MAXINT
-
-
-class RandomSampling(object):
-
-    def __init__(self, objective_function, config_space, n_samples=500, rng=None):
-        """
-        Samples candidates uniformly at random and returns the point with the highest objective value.
-
-        Parameters
-        ----------
-        objective_function: acquisition function
-            The acquisition function which will be maximized
-        n_samples: int
-            Number of candidates that are samples
-        """
-        self.config_space = config_space
-        self.objective_func = objective_function
-        if rng is None:
-            self.rng = np.random.RandomState(1357)
-        else:
-            self.rng = rng
-        self.n_samples = n_samples
-
-    def maximize(self, best_config, batch_size=1):
-        """
-        Maximizes the given acquisition function.
-
-        Parameters
-        ----------
-        batch_size: number of maximizer returned.
-
-        Returns
-        -------
-        np.ndarray(N,D)
-            Point with highest acquisition value.
-        """
-
-        incs_configs = list(get_one_exchange_neighbourhood(best_config, seed=self.rng.randint(MAXINT)))
-
-        # Sample random points uniformly over the whole space
-        rand_configs = sample_configurations(self.config_space, max(self.n_samples, batch_size) - len(incs_configs))
-
-        configs_list = incs_configs + rand_configs
-
-        y = self.objective_func(configs_list)
-        if batch_size == 1:
-            return [configs_list[np.argmax(y)]]
-
-        candidates = [configs_list[int(i)] for i in np.argsort(y)[-batch_size:][::-1]]   # fix: [::-1]
-        return candidates
 
 
 class mqBOHB_v0(mqHyperband):

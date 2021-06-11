@@ -1,13 +1,13 @@
-import os
 import time
+import os
 import numpy as np
+import traceback
 from math import log, ceil
 from sklearn.model_selection import KFold
 from scipy.optimize import minimize
 
-from mq_hb.async_mq_hb import async_mqHyperband
-from mq_hb.utils import RUNNING, COMPLETED, PROMOTED
-from mq_hb.utils import sample_configuration
+from mq_hb.mq_base_facade import mqBaseFacade
+from mq_hb.utils import sample_configurations, expand_configurations
 from mq_hb.utils import minmax_normalization, std_normalization
 from mq_hb.surrogate.rf_ensemble import RandomForestEnsemble
 
@@ -21,42 +21,51 @@ from openbox.utils.config_space.util import convert_configurations_to_array
 from openbox.utils.history_container import HistoryContainer
 
 
-class async_mqMFES_v13(async_mqHyperband):
+class mqMFES_v7(mqBaseFacade):
     """
-    The implementation of Asynchronous MFES (combine ASHA and MFES)
-    before fix
+    MFES-HB: https://arxiv.org/abs/2012.03011
     no median
-    promotion start threshold: v3
-    v6: non_decreasing_weight
-    === from v6
-    v13: choose n_iteration of new config by unadjusted weight (random choice)
-         update_weight when update_observation
-    """
+    non_decreasing_weight
 
+    === exp version : p_norm/prob local/random
+    use_weight_init=False
+    non_decreasing_weight=False, increasing_weight=True
+    v7: weight_method='rank_loss_prob' optimizer=localrandom
+    """
     def __init__(self, objective_func,
                  config_space: ConfigurationSpace,
                  R,
                  eta=3,
-                 skip_outer_loop=0,
+                 num_iter=10000,
                  rand_prob=0.3,
-                 use_weight_init=True,
                  init_weight=None, update_enable=True,
-                 weight_method='rank_loss_p_norm',
-                 fusion_method='idp',
+                 weight_method='rank_loss_prob', fusion_method='idp',
                  power_num=3,
-                 non_decreasing_weight=True,
+                 non_decreasing_weight=False,
+                 increasing_weight=True,
                  random_state=1,
-                 method_id='mqAsyncMFES',
+                 method_id='mqMFES',
                  restart_needed=True,
                  time_limit_per_trial=600,
                  runtime_limit=None,
                  ip='',
                  port=13579,
-                 authkey=b'abc'):
-        super().__init__(objective_func, config_space, R, eta=eta, skip_outer_loop=skip_outer_loop,
-                         random_state=random_state, method_id=method_id, restart_needed=restart_needed,
-                         time_limit_per_trial=time_limit_per_trial, runtime_limit=runtime_limit,
-                         ip=ip, port=port, authkey=authkey)
+                 authkey=b'abc',):
+        max_queue_len = 3 * R  # conservative design
+        super().__init__(objective_func, method_name=method_id,
+                         restart_needed=restart_needed, time_limit_per_trial=time_limit_per_trial,
+                         runtime_limit=runtime_limit,
+                         max_queue_len=max_queue_len, ip=ip, port=port, authkey=authkey)
+        self.seed = random_state
+        self.config_space = config_space
+        self.config_space.seed(self.seed)
+
+        self.R = R
+        self.eta = eta
+        self.logeta = lambda x: log(x) / log(self.eta)
+        self.s_max = int(self.logeta(self.R))
+        self.B = (self.s_max + 1) * self.R
+        self.num_iter = num_iter
 
         self.update_enable = update_enable
         self.fusion_method = fusion_method
@@ -73,14 +82,17 @@ class async_mqMFES_v13(async_mqHyperband):
         self.logger.info("Initialize weight to %s" % init_weight[:self.s_max + 1])
         types, bounds = get_types(config_space)
 
-        self.surrogate = RandomForestEnsemble(types, bounds, self.s_max, self.eta,
-                                              init_weight, self.fusion_method)
-        self.acquisition_function = EI(model=self.surrogate)
+        self.weighted_surrogate = RandomForestEnsemble(
+            types, bounds, self.s_max, self.eta, init_weight, self.fusion_method
+        )
+        self.acquisition_function = EI(model=self.weighted_surrogate)
+
+        self.incumbent_configs = []
+        self.incumbent_perfs = []
 
         self.iterate_id = 0
-        self.iterate_r = list()
+        self.iterate_r = []
         self.hist_weights = list()
-        self.hist_weights_unadjusted = list()
 
         # Saving evaluation statistics in Hyperband.
         self.target_x = dict()
@@ -88,10 +100,11 @@ class async_mqMFES_v13(async_mqHyperband):
         for index, item in enumerate(np.logspace(0, self.s_max, self.s_max + 1, base=self.eta)):
             r = int(item)
             self.iterate_r.append(r)
-            self.target_x[r] = list()
-            self.target_y[r] = list()
+            self.target_x[r] = []
+            self.target_y[r] = []
 
         # BO optimizer settings.
+        self.configs = list()
         self.history_container = HistoryContainer(task_id=self.method_name)
         self.sls_max_steps = None
         self.n_sls_iterations = 5
@@ -107,169 +120,149 @@ class async_mqMFES_v13(async_mqHyperband):
             rand_prob=0.0,
         )
         self.random_configuration_chooser = ChooserProb(prob=rand_prob, rng=self.rng)
-        self.random_check_idx = 0
 
         self.non_decreasing_weight = non_decreasing_weight
-        self.use_weight_init = use_weight_init
-        self.n_init_configs = np.array(
-            [len(init_iter_list) for init_iter_list in self.hb_bracket_list],
-            dtype=np.float64
-        )
+        self.increasing_weight = increasing_weight
+        assert not (self.non_decreasing_weight and self.increasing_weight)
 
-    def create_bracket(self):
-        """
-        bracket : list of rungs
-        rung: {
-            'rung_id': rung id (the lowest rung is 0),
-            'n_iteration': iterations (resource) per config for evaluation,
-            'jobs': list of [job_status, config, perf, extra_conf],
-            'configs': set of all configs in the rung,
-            'num_promoted': number of promoted configs in the rung,
-            'promotion_start_threshold':
-                promotion starts when number of completed/promoted jobs greater than threshold,
-        }
-        job_status: RUNNING, COMPLETED, PROMOTED
-        """
-        self.bracket = list()
-        s = self.s_max
-        # Initial number of iterations per config
-        r = self.R * self.eta ** (-s)
-        for i in range(s + 1):
-            n_iteration = r * self.eta ** (i)
-            promotion_start_threshold = self.R * self.eta ** (-i)
-            rung = dict(
-                rung_id=i,
-                n_iteration=n_iteration,
-                jobs=list(),
-                configs=set(),
-                num_promoted=0,
-                promotion_start_threshold=promotion_start_threshold,    # set promotion start threshold
-            )
-            self.bracket.append(rung)
-        self.logger.info('Init bracket: %s.' % str(self.bracket))
+    def iterate(self, skip_last=0):
 
-    def can_promote(self, rung_id):
-        """
-        return whether configs can be promoted in current rung
-        """
-        # if not enough jobs, do not promote
-        num_completed_promoted = len([job for job in self.bracket[rung_id]['jobs']
-                                      if job[0] in (COMPLETED, PROMOTED)])
-        num_promoted = self.bracket[rung_id]['num_promoted']
-        if num_completed_promoted == 0 or (num_promoted + 1) / num_completed_promoted > 1 / self.eta:
-            return False
+        for s in reversed(range(self.s_max + 1)):
 
-        # prevent error promotion in start stage
-        promotion_start_threshold = self.bracket[rung_id]['promotion_start_threshold']
-        if num_completed_promoted < promotion_start_threshold:
-            return False
-
-        return True
-
-    def update_observation(self, config, perf, n_iteration):
-        rung_id = self.get_rung_id(self.bracket, n_iteration)
-
-        updated = False
-        for job in self.bracket[rung_id]['jobs']:
-            _job_status, _config, _perf, _extra_conf = job
-            if _config == config:
-                assert _job_status == RUNNING
-                job[0] = COMPLETED
-                job[2] = perf
-                updated = True
-                break
-        assert updated
-        # print('=== bracket after update_observation:', self.get_bracket_status(self.bracket))
-
-        n_iteration = int(n_iteration)
-
-        configs_running = list()
-        for _config in self.bracket[rung_id]['configs']:
-            if _config not in self.target_x[n_iteration]:
-                configs_running.append(_config)
-        value_imputed = np.median(self.target_y[n_iteration])
-
-        self.target_x[n_iteration].append(config)
-        self.target_y[n_iteration].append(perf)
-
-        if n_iteration == self.R:
-            self.incumbent_configs.append(config)
-            self.incumbent_perfs.append(perf)
-            # Update history container.
-            self.history_container.add(config, perf)
-
-            # Update weight
-            if self.update_enable and len(self.incumbent_configs) >= 8:  # todo: replace 8 by full observation num
-                self.weight_update_id += 1
+            if self.update_enable and self.weight_update_id > self.s_max:
                 self.update_weight()
+            self.weight_update_id += 1
 
-        # Refit the ensemble surrogate model. todo: no median
-        configs_train = self.target_x[n_iteration]
-        results_train = self.target_y[n_iteration]
-        results_train = np.array(std_normalization(results_train), dtype=np.float64)
-        self.surrogate.train(convert_configurations_to_array(configs_train), results_train, r=n_iteration)
+            # Set initial number of configurations
+            n = int(ceil(self.B / self.R / (s + 1) * self.eta ** s))
+            # initial number of iterations per config
+            r = int(self.R * self.eta ** (-s))
 
-    def choose_next(self):
-        """
-        sample a config according to MFES. give iterations according to Hyperband strategy.
-        """
-        next_config = None
-        next_n_iteration = self.get_next_n_iteration()
-        next_rung_id = self.get_rung_id(self.bracket, next_n_iteration)
+            # Choose a batch of configurations in different mechanisms.
+            start_time = time.time()
+            T = self.choose_next(n)
+            time_elapsed = time.time() - start_time
+            self.logger.info("[%s] Choosing next configurations took %.2f sec." % (self.method_name, time_elapsed))
 
-        # sample config
-        excluded_configs = self.bracket[next_rung_id]['configs']
-        if len(self.target_y[self.iterate_r[-1]]) == 0:
-            next_config = sample_configuration(self.config_space, excluded_configs=excluded_configs)
-        else:
-            # Like BOHB, sample a fixed percentage of random configurations.
-            self.random_check_idx += 1
-            if self.random_configuration_chooser.check(self.random_check_idx):
-                next_config = sample_configuration(self.config_space, excluded_configs=excluded_configs)
-            else:
-                acq_configs = self.get_bo_candidates()
-                for config in acq_configs:
-                    if config not in self.bracket[next_rung_id]['configs']:
-                        next_config = config
-                        break
-                if next_config is None:
-                    self.logger.warning('Cannot get a non duplicate configuration from bo candidates. '
-                                        'Sample a random one.')
-                    next_config = sample_configuration(self.config_space, excluded_configs=excluded_configs)
+            extra_info = None
+            last_run_num = None
+            initial_run = True
 
-        next_extra_conf = {}
-        return next_config, next_n_iteration, next_extra_conf
+            for i in range((s + 1) - int(skip_last)):  # changed from s + 1
 
-    def get_next_n_iteration(self):
-        """
-        choose next_n_iteration according to weights
-        """
-        if self.use_weight_init and len(self.incumbent_configs) >= 3 * 8:  # todo: replace 8 by full observation num
-            weights = np.asarray(self.hist_weights_unadjusted[-1])     # caution the order of weights
-            choose_weights = weights * self.n_init_configs
-            choose_weights = choose_weights / np.sum(choose_weights)
-            next_n_iteration = self.rng.choice(self.iterate_r, p=choose_weights)
-            self.logger.info('random choosing next_n_iteration=%d. unadjusted_weights: %s. '
-                             'n_init_configs: %s. choose_weights: %s.'
-                             % (next_n_iteration, weights, self.n_init_configs, choose_weights))
-            if choose_weights[-1] > 1 / self.s_max:
-                self.logger.warning('Caution: choose_weight of full init resource (%f) is too large!'
-                                    % (choose_weights[-1],))
-            return next_n_iteration
+                # Run each of the n configs for <iterations>
+                # and keep best (n_configs / eta) configurations
 
-        return super().get_next_n_iteration()
+                n_configs = n * self.eta ** (-i)
+                n_iteration = r * self.eta ** (i)
 
-    def get_bo_candidates(self):
+                n_iter = n_iteration
+                if last_run_num is not None and not self.restart_needed:
+                    n_iter -= last_run_num
+                last_run_num = n_iteration
+
+                self.logger.info("%s: %d configurations x %d iterations each" %
+                                 (self.method_name, int(n_configs), int(n_iteration)))
+
+                ret_val, early_stops = self.run_in_parallel(T, n_iter, extra_info, initial_run)
+                initial_run = False
+                val_losses = [item['loss'] for item in ret_val]
+                ref_list = [item['ref_id'] for item in ret_val]
+
+                self.target_x[int(n_iteration)].extend(T)
+                self.target_y[int(n_iteration)].extend(val_losses)
+
+                if int(n_iteration) == self.R:
+                    self.incumbent_configs.extend(T)
+                    self.incumbent_perfs.extend(val_losses)
+                    # Update history container.
+                    for _config, _perf in zip(T, val_losses):
+                        self.history_container.add(_config, _perf)
+
+                # Select a number of best configurations for the next loop.
+                # Filter out early stops, if any.
+                indices = np.argsort(val_losses)
+                if len(T) == sum(early_stops):
+                    break
+                if len(T) >= self.eta:
+                    indices = [i for i in indices if not early_stops[i]]
+                    T = [T[i] for i in indices]
+                    extra_info = [ref_list[i] for i in indices]
+                    reduced_num = int(n_configs / self.eta)
+                    T = T[0:reduced_num]
+                    extra_info = extra_info[0:reduced_num]
+                else:
+                    T = [T[indices[0]]]     # todo: confirm no filter early stops?
+                    extra_info = [ref_list[indices[0]]]
+                val_losses = [val_losses[i] for i in indices][0:len(T)]  # update: sorted
+                incumbent_loss = val_losses[0]
+                self.add_stage_history(self.stage_id, min(self.global_incumbent, incumbent_loss))
+                self.stage_id += 1
+            # self.remove_immediate_model()
+
+            for item in self.iterate_r[self.iterate_r.index(r):]:
+                # NORMALIZE Objective value: normalization
+                normalized_y = std_normalization(self.target_y[item])
+                self.weighted_surrogate.train(convert_configurations_to_array(self.target_x[item]),
+                                              np.array(normalized_y, dtype=np.float64), r=item)
+
+    def run(self, skip_last=0):
+        try:
+            for iter in range(1, 1 + self.num_iter):
+                self.logger.info('-' * 50)
+                self.logger.info("%s algorithm: %d/%d iteration starts" % (self.method_name, iter, self.num_iter))
+                start_time = time.time()
+                self.iterate(skip_last=skip_last)
+                time_elapsed = (time.time() - start_time) / 60
+                self.logger.info("%d/%d-Iteration took %.2f min." % (iter, self.num_iter, time_elapsed))
+                self.iterate_id += 1
+                self.save_intermediate_statistics()
+        except Exception as e:
+            print(e)
+            print(traceback.format_exc())
+            self.logger.error(traceback.format_exc())
+            # Clean the immediate results.
+            # self.remove_immediate_model()
+
+    def get_bo_candidates(self, num_configs):
+        # todo: parallel methods
         std_incumbent_value = np.min(std_normalization(self.target_y[self.iterate_r[-1]]))
         # Update surrogate model in acquisition function.
-        self.acquisition_function.update(model=self.surrogate, eta=std_incumbent_value,
-                                         num_data=len(self.incumbent_configs))
+        self.acquisition_function.update(model=self.weighted_surrogate, eta=std_incumbent_value,
+                                         num_data=len(self.history_container.data))
 
         challengers = self.acq_optimizer.maximize(
             runhistory=self.history_container,
             num_points=5000,
         )
-        return challengers.challengers
+        return challengers.challengers[:num_configs]
+
+    def choose_next(self, num_config):
+        if len(self.target_y[self.iterate_r[-1]]) == 0:
+            configs = sample_configurations(self.config_space, num_config)
+            self.configs.extend(configs)
+            return configs
+
+        config_candidates = list()
+        acq_configs = self.get_bo_candidates(num_configs=2 * num_config)
+        acq_idx = 0
+        for idx in range(1, 1 + 2 * num_config):
+            # Like BOHB, sample a fixed percentage of random configurations.
+            if self.random_configuration_chooser.check(idx):
+                _config = self.config_space.sample_configuration()
+            else:
+                _config = acq_configs[acq_idx]
+                acq_idx += 1
+            if _config not in config_candidates and _config not in self.configs:
+                config_candidates.append(_config)
+            if len(config_candidates) >= num_config:
+                break
+
+        config_candidates = expand_configurations(config_candidates, self.config_space, num_config,
+                                                  excluded_configs=self.configs)
+        assert len(config_candidates) == num_config
+        self.configs.extend(config_candidates)
+        return config_candidates
 
     @staticmethod
     def calculate_preserving_order_num(y_pred, y_true):
@@ -289,17 +282,15 @@ class async_mqMFES_v13(async_mqHyperband):
 
         max_r = self.iterate_r[-1]
         incumbent_configs = self.target_x[max_r]
-        if len(incumbent_configs) < 3:
-            return
         test_x = convert_configurations_to_array(incumbent_configs)
         test_y = np.array(self.target_y[max_r], dtype=np.float64)
 
-        r_list = self.surrogate.surrogate_r
+        r_list = self.weighted_surrogate.surrogate_r
         K = len(r_list)
 
         old_weights = list()
         for i, r in enumerate(r_list):
-            _weight = self.surrogate.surrogate_weight[r]
+            _weight = self.weighted_surrogate.surrogate_weight[r]
             old_weights.append(_weight)
 
         if len(test_y) >= 3:
@@ -310,7 +301,7 @@ class async_mqMFES_v13(async_mqHyperband):
                 for i, r in enumerate(r_list):
                     fold_num = 5
                     if i != K - 1:
-                        mean, var = self.surrogate.surrogate_container[r].predict(test_x)   # todo check median imp!!!
+                        mean, var = self.weighted_surrogate.surrogate_container[r].predict(test_x)
                         tmp_y = np.reshape(mean, -1)
                         preorder_num, pair_num = self.calculate_preserving_order_num(tmp_y, test_y)
                         preserving_order_p.append(preorder_num / pair_num)
@@ -342,7 +333,7 @@ class async_mqMFES_v13(async_mqHyperband):
                 # For basic surrogate i=1:K-1.
                 mean_list, var_list = list(), list()
                 for i, r in enumerate(r_list[:-1]):
-                    mean, var = self.surrogate.surrogate_container[r].predict(test_x)
+                    mean, var = self.weighted_surrogate.surrogate_container[r].predict(test_x)
                     mean_list.append(np.reshape(mean, -1))
                     var_list.append(np.reshape(var, -1))
                 sample_num = 100
@@ -386,7 +377,6 @@ class async_mqMFES_v13(async_mqHyperband):
         # non decreasing full observation weight
         old_weights = np.asarray(old_weights)
         new_weights = np.asarray(new_weights)
-        self.hist_weights_unadjusted.append(new_weights)
         if self.non_decreasing_weight:
             old_last_weight = old_weights[-1]
             new_last_weight = new_weights[-1]
@@ -402,13 +392,28 @@ class async_mqMFES_v13(async_mqHyperband):
                                  'adjusted_new_weights=%s.' % (self.weight_method, self.weight_changed_cnt,
                                                                old_weights, new_weights, adjusted_new_weights))
                 new_weights = adjusted_new_weights
+        elif self.increasing_weight and len(test_y) >= 10:
+            s = 10
+            k = 0.025
+            a = 0.5
+            new_last_weight = a / (a + np.e ** (-(len(test_y) - s) * k))
+            new_remain_weight = 1.0 - new_last_weight
+            remain_weight = 1.0 - new_weights[-1]
+            if remain_weight <= 1e-8:
+                adjusted_new_weights = np.array([0.] * self.s_max + [1.], dtype=np.float64)
+            else:
+                adjusted_new_weights = np.append(new_weights[:-1] / remain_weight * new_remain_weight,
+                                                 new_last_weight)
+            self.logger.info('[%s] %d-th. increasing_weight: new_weights=%s, adjusted_new_weights=%s.'
+                             % (self.weight_method, self.weight_changed_cnt, new_weights, adjusted_new_weights))
+            new_weights = adjusted_new_weights
 
         self.logger.info('[%s] %d-th Updating weights: %s' % (
             self.weight_method, self.weight_changed_cnt, str(new_weights)))
 
         # Assign the weight to each basic surrogate.
         for i, r in enumerate(r_list):
-            self.surrogate.surrogate_weight[r] = new_weights[i]
+            self.weighted_surrogate.surrogate_weight[r] = new_weights[i]
         self.weight_changed_cnt += 1
         # Save the weight data.
         self.hist_weights.append(new_weights)
@@ -418,7 +423,14 @@ class async_mqMFES_v13(async_mqHyperband):
             os.makedirs(dir_path)
         np.save(os.path.join(dir_path, file_name), np.asarray(self.hist_weights))
         self.logger.info('update_weight() cost %.2fs. new weights are saved to %s'
-                         % (time.time() - start_time, os.path.join(dir_path, file_name)))
+                         % (time.time()-start_time, os.path.join(dir_path, file_name)))
+
+    def get_incumbent(self, num_inc=1):
+        assert (len(self.incumbent_perfs) == len(self.incumbent_configs))
+        indices = np.argsort(self.incumbent_perfs)
+        configs = [self.incumbent_configs[i] for i in indices[0:num_inc]]
+        perfs = [self.incumbent_perfs[i] for i in indices[0: num_inc]]
+        return configs, perfs
 
     def get_weights(self):
         return self.hist_weights

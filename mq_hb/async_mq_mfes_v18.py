@@ -10,6 +10,7 @@ from mq_hb.utils import RUNNING, COMPLETED, PROMOTED
 from mq_hb.utils import sample_configuration
 from mq_hb.utils import minmax_normalization, std_normalization
 from mq_hb.surrogate.rf_ensemble import RandomForestEnsemble
+from mq_hb.acq_maximizer.ei_optimization import RandomSampling
 
 from openbox.utils.util_funcs import get_types
 from openbox.utils.config_space import ConfigurationSpace
@@ -112,7 +113,6 @@ class async_mqMFES_v18(async_mqHyperband):
         self.random_configuration_chooser = ChooserProb(prob=rand_prob, rng=self.rng)
         self.random_check_idx = 0
 
-        from mq_hb.async_mq_bohb import RandomSampling
         self.acq_optimizer = RandomSampling(self.acquisition_function, config_space,
                                             n_samples=max(5000, 50 * len(bounds)))
 

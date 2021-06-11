@@ -5,7 +5,7 @@ from math import log, ceil
 from sklearn.model_selection import KFold
 from scipy.optimize import minimize
 
-from mq_hb.async_mq_hb import async_mqHyperband
+from mq_hb.async_mq_hb_v2 import async_mqHyperband_v2
 from mq_hb.utils import RUNNING, COMPLETED, PROMOTED
 from mq_hb.utils import sample_configuration
 from mq_hb.utils import minmax_normalization, std_normalization
@@ -21,16 +21,19 @@ from openbox.utils.config_space.util import convert_configurations_to_array
 from openbox.utils.history_container import HistoryContainer
 
 
-class async_mqMFES_v13(async_mqHyperband):
+class async_mqMFES_v40(async_mqHyperband_v2):
     """
     The implementation of Asynchronous MFES (combine ASHA and MFES)
-    before fix
     no median
-    promotion start threshold: v3
     v6: non_decreasing_weight
     === from v6
-    v13: choose n_iteration of new config by unadjusted weight (random choice)
+    v14: choose n_iteration of new config by unadjusted weight (random choice)
          update_weight when update_observation
+         use asynchronous Hyperband with promotion cycle
+    === exp version: asha vs new asha
+    non_decreasing_weight=False, increasing_weight=True
+    weight_method='rank_loss_prob' optimizer=localrandom
+    v40: new asha, use_weight_init=False
     """
 
     def __init__(self, objective_func,
@@ -39,12 +42,13 @@ class async_mqMFES_v13(async_mqHyperband):
                  eta=3,
                  skip_outer_loop=0,
                  rand_prob=0.3,
-                 use_weight_init=True,
+                 use_weight_init=False,
                  init_weight=None, update_enable=True,
-                 weight_method='rank_loss_p_norm',
+                 weight_method='rank_loss_prob',
                  fusion_method='idp',
                  power_num=3,
-                 non_decreasing_weight=True,
+                 non_decreasing_weight=False,
+                 increasing_weight=True,
                  random_state=1,
                  method_id='mqAsyncMFES',
                  restart_needed=True,
@@ -110,104 +114,78 @@ class async_mqMFES_v13(async_mqHyperband):
         self.random_check_idx = 0
 
         self.non_decreasing_weight = non_decreasing_weight
+        self.increasing_weight = increasing_weight
+        assert not (self.non_decreasing_weight and self.increasing_weight)
         self.use_weight_init = use_weight_init
         self.n_init_configs = np.array(
             [len(init_iter_list) for init_iter_list in self.hb_bracket_list],
             dtype=np.float64
         )
 
-    def create_bracket(self):
-        """
-        bracket : list of rungs
-        rung: {
-            'rung_id': rung id (the lowest rung is 0),
-            'n_iteration': iterations (resource) per config for evaluation,
-            'jobs': list of [job_status, config, perf, extra_conf],
-            'configs': set of all configs in the rung,
-            'num_promoted': number of promoted configs in the rung,
-            'promotion_start_threshold':
-                promotion starts when number of completed/promoted jobs greater than threshold,
-        }
-        job_status: RUNNING, COMPLETED, PROMOTED
-        """
-        self.bracket = list()
-        s = self.s_max
-        # Initial number of iterations per config
-        r = self.R * self.eta ** (-s)
-        for i in range(s + 1):
-            n_iteration = r * self.eta ** (i)
-            promotion_start_threshold = self.R * self.eta ** (-i)
-            rung = dict(
-                rung_id=i,
-                n_iteration=n_iteration,
-                jobs=list(),
-                configs=set(),
-                num_promoted=0,
-                promotion_start_threshold=promotion_start_threshold,    # set promotion start threshold
-            )
-            self.bracket.append(rung)
-        self.logger.info('Init bracket: %s.' % str(self.bracket))
-
-    def can_promote(self, rung_id):
-        """
-        return whether configs can be promoted in current rung
-        """
-        # if not enough jobs, do not promote
-        num_completed_promoted = len([job for job in self.bracket[rung_id]['jobs']
-                                      if job[0] in (COMPLETED, PROMOTED)])
-        num_promoted = self.bracket[rung_id]['num_promoted']
-        if num_completed_promoted == 0 or (num_promoted + 1) / num_completed_promoted > 1 / self.eta:
-            return False
-
-        # prevent error promotion in start stage
-        promotion_start_threshold = self.bracket[rung_id]['promotion_start_threshold']
-        if num_completed_promoted < promotion_start_threshold:
-            return False
-
-        return True
-
     def update_observation(self, config, perf, n_iteration):
-        rung_id = self.get_rung_id(self.bracket, n_iteration)
-
+        """
+        update bracket and check promotion cycle
+        """
+        # update bracket
         updated = False
-        for job in self.bracket[rung_id]['jobs']:
-            _job_status, _config, _perf, _extra_conf = job
-            if _config == config:
-                assert _job_status == RUNNING
-                job[0] = COMPLETED
-                job[2] = perf
-                updated = True
+        updated_bracket_id, updated_rung_id = None, None
+        for bracket_id, bracket in enumerate(self.brackets):
+            rung_id = self.get_rung_id(bracket, n_iteration)
+            if rung_id is None:
+                # we check brackets in order. should be updated in previous bracket.
+                raise ValueError('rung_id not found by n_iteration %d in bracket %d.' % (int(n_iteration), bracket_id))
+
+            for job in bracket[rung_id]['jobs']:
+                _job_status, _config, _perf, _extra_conf = job
+                if _config == config:
+                    if _job_status != RUNNING:
+                        self.logger.warning('Job status is not RUNNING when update observation. '
+                                            'There may exist duplicated configs in different brackets. '
+                                            'bracket_id: %d, rung_id: %d, job: %s, observation: %s.'
+                                            % (bracket_id, rung_id, job, (config, perf, n_iteration)))
+                        break
+                    job[0] = COMPLETED
+                    job[2] = perf
+                    updated = True
+                    updated_bracket_id, updated_rung_id = bracket_id, rung_id
+                    self.logger.info('update observation in bracket %d rung %d.' % (bracket_id, rung_id))
+                    break
+            if updated:
                 break
         assert updated
-        # print('=== bracket after update_observation:', self.get_bracket_status(self.bracket))
+        # print('=== bracket after update_observation:', self.get_brackets_status(self.brackets))
 
         n_iteration = int(n_iteration)
 
-        configs_running = list()
-        for _config in self.bracket[rung_id]['configs']:
-            if _config not in self.target_x[n_iteration]:
-                configs_running.append(_config)
-        value_imputed = np.median(self.target_y[n_iteration])
+        if config in self.target_x[n_iteration]:
+            self.logger.warning('Duplicated config in self.target_x[%d]: %s' % (n_iteration, config))
+        else:
+            self.target_x[n_iteration].append(config)
+            self.target_y[n_iteration].append(perf)
 
-        self.target_x[n_iteration].append(config)
-        self.target_y[n_iteration].append(perf)
-
-        if n_iteration == self.R:
-            self.incumbent_configs.append(config)
-            self.incumbent_perfs.append(perf)
-            # Update history container.
-            self.history_container.add(config, perf)
+        if int(n_iteration) == self.R:
+            if config in self.incumbent_configs:
+                self.logger.warning('Duplicated config in self.incumbent_configs: %s' % config)
+            else:
+                self.incumbent_configs.append(config)
+                self.incumbent_perfs.append(perf)
+                # Update history container.
+                self.history_container.add(config, perf)
 
             # Update weight
             if self.update_enable and len(self.incumbent_configs) >= 8:  # todo: replace 8 by full observation num
                 self.weight_update_id += 1
                 self.update_weight()
 
-        # Refit the ensemble surrogate model. todo: no median
+        # Refit the ensemble surrogate model.
         configs_train = self.target_x[n_iteration]
         results_train = self.target_y[n_iteration]
         results_train = np.array(std_normalization(results_train), dtype=np.float64)
         self.surrogate.train(convert_configurations_to_array(configs_train), results_train, r=n_iteration)
+
+        # check promotion cycle
+        self.check_promotion(updated_bracket_id, updated_rung_id)
+        return
 
     def choose_next(self):
         """
@@ -215,10 +193,10 @@ class async_mqMFES_v13(async_mqHyperband):
         """
         next_config = None
         next_n_iteration = self.get_next_n_iteration()
-        next_rung_id = self.get_rung_id(self.bracket, next_n_iteration)
+        bracket_id = self.get_bracket_id(self.brackets, next_n_iteration)
 
         # sample config
-        excluded_configs = self.bracket[next_rung_id]['configs']
+        excluded_configs = self.brackets[bracket_id][0]['configs']
         if len(self.target_y[self.iterate_r[-1]]) == 0:
             next_config = sample_configuration(self.config_space, excluded_configs=excluded_configs)
         else:
@@ -229,7 +207,7 @@ class async_mqMFES_v13(async_mqHyperband):
             else:
                 acq_configs = self.get_bo_candidates()
                 for config in acq_configs:
-                    if config not in self.bracket[next_rung_id]['configs']:
+                    if config not in excluded_configs:
                         next_config = config
                         break
                 if next_config is None:
@@ -245,16 +223,24 @@ class async_mqMFES_v13(async_mqHyperband):
         choose next_n_iteration according to weights
         """
         if self.use_weight_init and len(self.incumbent_configs) >= 3 * 8:  # todo: replace 8 by full observation num
-            weights = np.asarray(self.hist_weights_unadjusted[-1])     # caution the order of weights
-            choose_weights = weights * self.n_init_configs
-            choose_weights = choose_weights / np.sum(choose_weights)
+            power_num = 3
+            top_k = 2
+            new_weights = self.hist_weights_unadjusted[-1]
+            choose_weights = np.array(new_weights, dtype=np.float64) ** power_num
+            choose_weights[-1] = 0.
+            top_idx = np.argsort(choose_weights)[::-1][:top_k]
+            # retain top k weights
+            for i in range(len(choose_weights)):
+                if i not in top_idx:
+                    choose_weights[i] = 0.
+            weight_sum = np.sum(choose_weights)
+            if weight_sum <= 1e-8:
+                choose_weights = np.array([1. / self.s_max] * self.s_max + [0.], dtype=np.float64)
+            else:
+                choose_weights = choose_weights / weight_sum
             next_n_iteration = self.rng.choice(self.iterate_r, p=choose_weights)
-            self.logger.info('random choosing next_n_iteration=%d. unadjusted_weights: %s. '
-                             'n_init_configs: %s. choose_weights: %s.'
-                             % (next_n_iteration, weights, self.n_init_configs, choose_weights))
-            if choose_weights[-1] > 1 / self.s_max:
-                self.logger.warning('Caution: choose_weight of full init resource (%f) is too large!'
-                                    % (choose_weights[-1],))
+            self.logger.info('random choosing next_n_iteration=%d. new_weights: %s. choose_weights: %s.'
+                             % (next_n_iteration, new_weights, choose_weights))
             return next_n_iteration
 
         return super().get_next_n_iteration()
@@ -402,6 +388,21 @@ class async_mqMFES_v13(async_mqHyperband):
                                  'adjusted_new_weights=%s.' % (self.weight_method, self.weight_changed_cnt,
                                                                old_weights, new_weights, adjusted_new_weights))
                 new_weights = adjusted_new_weights
+        elif self.increasing_weight and len(test_y) >= 10:
+            s = 10
+            k = 0.025
+            a = 0.5
+            new_last_weight = a / (a + np.e ** (-(len(test_y) - s) * k))
+            new_remain_weight = 1.0 - new_last_weight
+            remain_weight = 1.0 - new_weights[-1]
+            if remain_weight <= 1e-8:
+                adjusted_new_weights = np.array([0.] * self.s_max + [1.], dtype=np.float64)
+            else:
+                adjusted_new_weights = np.append(new_weights[:-1] / remain_weight * new_remain_weight,
+                                                 new_last_weight)
+            self.logger.info('[%s] %d-th. increasing_weight: new_weights=%s, adjusted_new_weights=%s.'
+                             % (self.weight_method, self.weight_changed_cnt, new_weights, adjusted_new_weights))
+            new_weights = adjusted_new_weights
 
         self.logger.info('[%s] %d-th Updating weights: %s' % (
             self.weight_method, self.weight_changed_cnt, str(new_weights)))

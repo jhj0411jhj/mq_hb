@@ -416,8 +416,11 @@ class async_mqMFES_v24(async_mqHyperband):
             if new_last_weight < old_last_weight:
                 old_remain_weight = 1.0 - old_last_weight
                 new_remain_weight = 1.0 - new_last_weight
-                adjusted_new_weights = np.append(new_weights[:-1] / new_remain_weight * old_remain_weight,
-                                                 old_last_weight)
+                if new_remain_weight <= 1e-8:
+                    adjusted_new_weights = np.array([0.] * self.s_max + [1.], dtype=np.float64)
+                else:
+                    adjusted_new_weights = np.append(new_weights[:-1] / new_remain_weight * old_remain_weight,
+                                                     old_last_weight)
                 self.logger.info('[%s] %d-th. non_decreasing_weight: old_weights=%s, new_weights=%s, '
                                  'adjusted_new_weights=%s.' % (self.weight_method, self.weight_changed_cnt,
                                                                old_weights, new_weights, adjusted_new_weights))
@@ -429,8 +432,11 @@ class async_mqMFES_v24(async_mqHyperband):
             new_last_weight = a / (a + np.e ** (-(len(test_y) - s) * k))
             new_remain_weight = 1.0 - new_last_weight
             remain_weight = 1.0 - new_weights[-1]
-            adjusted_new_weights = np.append(new_weights[:-1] / remain_weight * new_remain_weight,
-                                             new_last_weight)
+            if remain_weight <= 1e-8:
+                adjusted_new_weights = np.array([0.] * self.s_max + [1.], dtype=np.float64)
+            else:
+                adjusted_new_weights = np.append(new_weights[:-1] / remain_weight * new_remain_weight,
+                                                 new_last_weight)
             self.logger.info('[%s] %d-th. increasing_weight: new_weights=%s, adjusted_new_weights=%s.'
                              % (self.weight_method, self.weight_changed_cnt, new_weights, adjusted_new_weights))
             new_weights = adjusted_new_weights

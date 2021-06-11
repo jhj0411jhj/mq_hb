@@ -12,22 +12,72 @@ import numpy as np
 import pickle as pkl
 import matplotlib.pyplot as plt
 
-from utils import setup_exp, create_plot_points
+from utils import setup_exp, descending, create_plot_points
 
 #default_mths = 'random-n1,random-n3,smac,hyperband-n1,hyperband-n3,bohb-n1,bohb-n3,mfes-n1,mfes-n3'
-default_mths = 'hyperband-n8,bohb-n8,mfes-n8,ahb-n8,amfesv3-n8'
+default_mths = 'hyperband-n8,bohb-n8,mfes-n8,amfesv0-n8,amfesv3-n8,amfesv6-n8'
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', type=str)
 parser.add_argument('--mths', type=str, default=default_mths)
 parser.add_argument('--R', type=int, default=27)
 parser.add_argument('--runtime_limit', type=int)    # if you don't want to use default setup
+parser.add_argument('--model', type=str, default='xgb')
+parser.add_argument('--default_value', type=float, default=0.0)
 
 args = parser.parse_args()
 dataset = args.dataset
 mths = args.mths.split(',')
 R = args.R
-model = 'xgb'
+model = args.model
+default_value = args.default_value
+
+
+def fetch_color_marker_old(m_list):
+    color_dict = dict()
+    marker_dict = dict()
+    color_list = ['purple', 'royalblue', 'green', 'brown', 'red', 'orange', 'yellowgreen', 'black', 'yellow']
+    markers = ['s', '^', '*', 'v', 'o', 'p', '2', 'x', 'd']
+
+    def fill_values(name, idx):
+        color_dict[name] = color_list[idx]
+        marker_dict[name] = markers[idx]
+
+    for name in m_list:
+        if name.startswith('random-n1'):
+            fill_values(name, 1)
+        elif name.startswith('random-n3'):
+            fill_values(name, 6)
+        elif name.startswith('smac'):
+            fill_values(name, 3)
+        elif name.startswith('hyperband-n1'):
+            fill_values(name, 5)
+        elif name.startswith('hyperband-n3'):
+            fill_values(name, 2)
+        elif name.startswith('bohb-n1'):
+            fill_values(name, 0)
+        elif name.startswith('bohb-n'):
+            fill_values(name, 4)
+        elif name.startswith('mfes-n1'):
+            fill_values(name, 8)
+        elif name.startswith('mfes-n'):
+            fill_values(name, 7)
+        elif name.startswith('amfes-n1'):
+            fill_values(name, 2)
+        elif name.startswith('amfes-n'):
+            fill_values(name, 1)
+        elif name.startswith('mfesv2-n1'):
+            fill_values(name, 3)
+        elif name.startswith('mfesv2-n3'):
+            fill_values(name, 5)
+        elif name.startswith('mfesv3-n1'):
+            fill_values(name, 2)
+        elif name.startswith('mfesv3-n3'):
+            fill_values(name, 1)
+        else:
+            print('color not defined:', name)
+            fill_values(name, 1)
+    return color_dict, marker_dict
 
 
 def fetch_color_marker(m_list):
@@ -122,6 +172,15 @@ def plot_setup(_dataset):
     elif _dataset.startswith('censusincome'):
         plt.ylim(-0.747, -0.737)
         plt.xlim(0, runtime_limit)
+    elif _dataset == 'cifar10-valid':
+        plt.ylim(-91.65, -90.85)
+        plt.xlim(0, runtime_limit)
+    elif _dataset == 'cifar100':
+        plt.ylim(-73.7, -70.7)
+        plt.xlim(0, runtime_limit)
+    elif _dataset == 'ImageNet16-120':
+        plt.ylim(-47.0, -45.0)
+        plt.xlim(0, runtime_limit)
 
 
 print('start', dataset)
@@ -131,9 +190,10 @@ if args.runtime_limit is not None:
     runtime_limit = args.runtime_limit
 plot_setup(dataset)
 color_dict, marker_dict = fetch_color_marker(mths)
+point_num = 10000
 lw = 2
 markersize = 6
-markevery = int(10000 / 10)
+markevery = int(point_num / 10)
 std_scale = 0.3
 alpha = 0.2
 
@@ -149,9 +209,9 @@ for mth in mths:
                 raw_recorder = pkl.load(f)
             recorder = []
             for record in raw_recorder:
-                if record.get('n_iteration') is not None and record['n_iteration'] < R:
-                    print('error abandon record by n_iteration:', R, mth, record)
-                    continue
+                # if record.get('n_iteration') is not None and record['n_iteration'] < R:
+                #     print('error abandon record by n_iteration:', R, mth, record)
+                #     continue
                 if record['global_time'] > runtime_limit:
                     print('abandon record by runtime_limit:', runtime_limit, mth, record)
                     continue
@@ -175,11 +235,11 @@ for mth in mths:
             # for debugging
             # if mth == 'smac':
             #     plt.plot(timestamp, perf, label=file)
-    x, m, s = create_plot_points(stats, 0, runtime_limit, 10000)
+    x, m, s = create_plot_points(stats, 0, runtime_limit, point_num=point_num, default=default_value)
     result[mth] = (x, m, s)
     # plot
-    plt.plot(x, m, lw=lw, label=get_mth_legend(mth, show_mode=True),
-             color=color_dict[mth], marker=marker_dict[mth],
+    plt.plot(x, m, lw=lw, label=get_mth_legend(mth, show_mode=False),
+             #color=color_dict[mth], marker=marker_dict[mth],
              markersize=markersize, markevery=markevery)
     #plt.fill_between(x, m - s * std_scale, m + s * std_scale, alpha=alpha, facecolor=color_dict[mth])
 
@@ -187,6 +247,8 @@ for mth in mths:
 speedup_algo = 2
 print('===== mth - baseline - speedup ===== speedup_algo =', speedup_algo)
 for mth in mths:
+    if not (mth.startswith('amfes') or mth.startswith('mfes')):
+        continue
     for baseline in mths:
         baseline_perf = result[baseline][1][-1]
         if speedup_algo == 1:   # algo 1
@@ -219,6 +281,8 @@ for mth in mths:
     perfs = None
     if dataset == 'kuaishou1':
         print(dataset, mth, perfs, u'%.5f\u00B1%.5f' % (m, s))
+    elif dataset in ['cifar10', 'cifar10-valid', 'cifar100', 'ImageNet16-120']:
+        print(dataset, mth, perfs, u'%.2f\u00B1%.2f' % (m, s))
     else:
         print(dataset, mth, perfs, u'%.4f\u00B1%.4f' % (m, s))
 
