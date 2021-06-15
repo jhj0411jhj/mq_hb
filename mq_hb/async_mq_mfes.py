@@ -10,6 +10,7 @@ from mq_hb.utils import RUNNING, COMPLETED, PROMOTED
 from mq_hb.utils import sample_configuration
 from mq_hb.utils import minmax_normalization, std_normalization
 from mq_hb.surrogate.rf_ensemble import RandomForestEnsemble
+from mq_hb.acq_maximizer.ei_optimization import RandomSampling
 
 from openbox.utils.util_funcs import get_types
 from openbox.utils.config_space import ConfigurationSpace
@@ -32,12 +33,20 @@ class async_mqMFES(async_mqHyperband):
                  eta=3,
                  skip_outer_loop=0,
                  rand_prob=0.3,
-                 use_bohb=False,
-                 use_weight_bracket=False,
                  init_weight=None, update_enable=True,
                  weight_method='rank_loss_p_norm',
                  fusion_method='idp',
                  power_num=3,
+                 set_promotion_threshold=True,
+                 non_decreasing_weight=False,
+                 increasing_weight=True,
+                 acq_optimizer='local_random',  # 'local_random', 'random'
+                 use_weight_init=True,
+                 weight_init_method='proportional',  # 'proportional', 'pow'
+                 test_sh=False,
+                 test_random=False,
+                 test_bohb=False,
+                 test_original_asha=False,
                  random_state=1,
                  method_id='mqAsyncMFES',
                  restart_needed=True,
@@ -46,12 +55,19 @@ class async_mqMFES(async_mqHyperband):
                  ip='',
                  port=13579,
                  authkey=b'abc'):
+
+        self.set_promotion_threshold = set_promotion_threshold
+
         super().__init__(objective_func, config_space, R, eta=eta, skip_outer_loop=skip_outer_loop,
                          random_state=random_state, method_id=method_id, restart_needed=restart_needed,
                          time_limit_per_trial=time_limit_per_trial, runtime_limit=runtime_limit,
                          ip=ip, port=port, authkey=authkey)
-        self.use_bohb_strategy = use_bohb
-        self.use_weight_bracket = use_weight_bracket
+
+        # test version
+        self.test_sh = test_sh
+        self.test_random = test_random
+        self.test_bohb = test_bohb
+        self.test_original_asha = test_original_asha
 
         self.update_enable = update_enable
         self.fusion_method = fusion_method
@@ -62,22 +78,26 @@ class async_mqMFES(async_mqHyperband):
         self.weight_update_id = 0
         self.weight_changed_cnt = 0
 
-        if init_weight is None:
-            init_weight = [1. / self.s_max] * self.s_max + [0.]
-        assert len(init_weight) == (self.s_max + 1)
-        self.logger.info("Initialize weight to %s" % init_weight[:self.s_max + 1])
+        self.init_weight = init_weight
+        if self.init_weight is None:
+            if self.test_bohb:
+                self.init_weight = [0.] * self.s_max + [1.]
+            elif self.s_max == 0:
+                self.init_weight = [1.]
+            else:
+                self.init_weight = [1. / self.s_max] * self.s_max + [0.]
+        assert len(self.init_weight) == (self.s_max + 1)
+        self.logger.info("Initialize weight to %s" % self.init_weight)
         types, bounds = get_types(config_space)
 
-        if not self.use_bohb_strategy:
-            self.surrogate = RandomForestEnsemble(types, bounds, self.s_max, self.eta,
-                                                  init_weight, self.fusion_method)
-        else:
-            self.surrogate = RandomForestWithInstances(types, bounds, seed=self.seed)
+        self.surrogate = RandomForestEnsemble(types, bounds, self.s_max, self.eta,
+                                              self.init_weight, self.fusion_method)
         self.acquisition_function = EI(model=self.surrogate)
 
         self.iterate_id = 0
         self.iterate_r = list()
         self.hist_weights = list()
+        self.hist_weights_unadjusted = list()
 
         # Saving evaluation statistics in Hyperband.
         self.target_x = dict()
@@ -94,17 +114,89 @@ class async_mqMFES(async_mqHyperband):
         self.n_sls_iterations = 5
         self.sls_n_steps_plateau_walk = 10
         self.rng = np.random.RandomState(seed=self.seed)
-        self.acq_optimizer = InterleavedLocalAndRandomSearch(
-            acquisition_function=self.acquisition_function,
-            config_space=self.config_space,
-            rng=self.rng,
-            max_steps=self.sls_max_steps,
-            n_steps_plateau_walk=self.sls_n_steps_plateau_walk,
-            n_sls_iterations=self.n_sls_iterations,
-            rand_prob=0.0,
-        )
+        self.acq_optimizer_type = acq_optimizer
+        if self.acq_optimizer_type == 'local_random':
+            self.acq_optimizer = InterleavedLocalAndRandomSearch(
+                acquisition_function=self.acquisition_function,
+                config_space=self.config_space,
+                rng=self.rng,
+                max_steps=self.sls_max_steps,
+                n_steps_plateau_walk=self.sls_n_steps_plateau_walk,
+                n_sls_iterations=self.n_sls_iterations,
+                rand_prob=0.0,
+            )
+        elif self.acq_optimizer_type == 'random':
+            self.acq_optimizer = RandomSampling(self.acquisition_function, config_space,
+                                                n_samples=max(5000, 50 * len(bounds)))
+        else:
+            raise ValueError
         self.random_configuration_chooser = ChooserProb(prob=rand_prob, rng=self.rng)
         self.random_check_idx = 0
+
+        self.non_decreasing_weight = non_decreasing_weight
+        self.increasing_weight = increasing_weight
+        assert not (self.non_decreasing_weight and self.increasing_weight)
+        self.use_weight_init = use_weight_init
+        self.weight_init_method = weight_init_method
+        assert self.weight_init_method in ['proportional', 'pow']
+        self.n_init_configs = np.array(
+            [len(init_iter_list) for init_iter_list in self.hb_bracket_list],
+            dtype=np.float64
+        )
+
+    def create_bracket(self):
+        """
+        bracket : list of rungs
+        rung: {
+            'rung_id': rung id (the lowest rung is 0),
+            'n_iteration': iterations (resource) per config for evaluation,
+            'jobs': list of [job_status, config, perf, extra_conf],
+            'configs': set of all configs in the rung,
+            'num_promoted': number of promoted configs in the rung,
+            'promotion_start_threshold':
+                promotion starts when number of completed/promoted jobs greater than threshold,
+        }
+        job_status: RUNNING, COMPLETED, PROMOTED
+        """
+        self.bracket = list()
+        s = self.s_max
+        # Initial number of iterations per config
+        r = self.R * self.eta ** (-s)
+        for i in range(s + 1):
+            n_iteration = r * self.eta ** (i)
+            promotion_start_threshold = self.R * self.eta ** (-i)
+            rung = dict(
+                rung_id=i,
+                n_iteration=n_iteration,
+                jobs=list(),
+                configs=set(),
+                num_promoted=0,
+                # set promotion start threshold
+                promotion_start_threshold=promotion_start_threshold if self.set_promotion_threshold else 0,
+            )
+            self.bracket.append(rung)
+        self.logger.info('Init bracket: %s.' % str(self.bracket))
+
+    def can_promote(self, rung_id):
+        """
+        return whether configs can be promoted in current rung
+        """
+        if self.test_original_asha:
+            return True
+
+        # if not enough jobs, do not promote
+        num_completed_promoted = len([job for job in self.bracket[rung_id]['jobs']
+                                      if job[0] in (COMPLETED, PROMOTED)])
+        num_promoted = self.bracket[rung_id]['num_promoted']
+        if num_completed_promoted == 0 or (num_promoted + 1) / num_completed_promoted > 1 / self.eta:
+            return False
+
+        # prevent error promotion in start stage
+        promotion_start_threshold = self.bracket[rung_id]['promotion_start_threshold']
+        if num_completed_promoted < promotion_start_threshold:
+            return False
+
+        return True
 
     def update_observation(self, config, perf, n_iteration):
         rung_id = self.get_rung_id(self.bracket, n_iteration)
@@ -138,20 +230,16 @@ class async_mqMFES(async_mqHyperband):
             # Update history container.
             self.history_container.add(config, perf)
 
-            # todo: fix: update weight. len>=5 ?
-            if not self.use_bohb_strategy and self.update_enable and len(self.incumbent_configs) >= 5:
+            # Update weight
+            if self.update_enable and len(self.incumbent_configs) >= 8:  # todo: replace 8 by full observation num
+                self.weight_update_id += 1
                 self.update_weight()
-                new_weights = self.hist_weights[-1]  # caution the order of weights
 
-        # Refit the ensemble surrogate model.
-        configs_train = self.target_x[n_iteration] + configs_running
-        results_train = self.target_y[n_iteration] + [value_imputed] * len(configs_running)
+        # Refit the ensemble surrogate model. todo: no median
+        configs_train = self.target_x[n_iteration]
+        results_train = self.target_y[n_iteration]
         results_train = np.array(std_normalization(results_train), dtype=np.float64)
-        if not self.use_bohb_strategy:
-            self.surrogate.train(convert_configurations_to_array(configs_train), results_train, r=n_iteration)
-        else:
-            if n_iteration == self.R:
-                self.surrogate.train(convert_configurations_to_array(configs_train), results_train)
+        self.surrogate.train(convert_configurations_to_array(configs_train), results_train, r=n_iteration)
 
     def choose_next(self):
         """
@@ -163,7 +251,7 @@ class async_mqMFES(async_mqHyperband):
 
         # sample config
         excluded_configs = self.bracket[next_rung_id]['configs']
-        if len(self.target_y[self.iterate_r[-1]]) == 0:
+        if len(self.target_y[self.iterate_r[-1]]) == 0 or self.test_random:
             next_config = sample_configuration(self.config_space, excluded_configs=excluded_configs)
         else:
             # Like BOHB, sample a fixed percentage of random configurations.
@@ -186,48 +274,73 @@ class async_mqMFES(async_mqHyperband):
 
     def get_next_n_iteration(self):
         """
-        update: update weight and choose next bracket according to weights
+        choose next_n_iteration according to weights
         """
-        def choose_next_bracket():
-            self.hb_bracket_id += 1
-            if self.hb_bracket_id == len(self.hb_bracket_list):
-                self.hb_bracket_id = 0
+        if self.test_sh:
+            return self.bracket[0]['n_iteration']
 
-        next_n_iteration = self.hb_iter_list[self.hb_iter_id]
-        self.hb_iter_id += 1
-        # next bracket
-        if self.hb_iter_id == len(self.hb_iter_list):
-            self.hb_iter_id = 0
+        if self.use_weight_init and len(self.incumbent_configs) >= 3 * 8:  # todo: replace 8 by full observation num
+            if self.weight_init_method == 'proportional':
+                top_k = 2
+                new_weights = self.hist_weights_unadjusted[-1]
+                choose_weights = np.asarray(new_weights, dtype=np.float64) * self.n_init_configs
+                top_idx = np.argsort(choose_weights)[::-1][:top_k]
+                # retain top k weights
+                for i in range(len(choose_weights)):
+                    if i not in top_idx:
+                        choose_weights[i] = 0.
+                choose_weights = choose_weights / np.sum(choose_weights)
+                next_n_iteration = self.rng.choice(self.iterate_r, p=choose_weights)
+                self.logger.info('random choosing next_n_iteration=%d. unadjusted_weights: %s. '
+                                 'n_init_configs: %s. choose_weights: %s.'
+                                 % (next_n_iteration, new_weights, self.n_init_configs, choose_weights))
+            elif self.weight_init_method == 'pow':
+                top_k = 2
+                new_weights = self.hist_weights_unadjusted[-1]
+                choose_weights = np.array(new_weights, dtype=np.float64) ** self.power_num
+                choose_weights[-1] = 0.
+                top_idx = np.argsort(choose_weights)[::-1][:top_k]
+                # retain top k weights
+                for i in range(len(choose_weights)):
+                    if i not in top_idx:
+                        choose_weights[i] = 0.
+                weight_sum = np.sum(choose_weights)
+                if weight_sum <= 1e-8:
+                    choose_weights = np.array(self.init_weight, dtype=np.float64)
+                else:
+                    choose_weights = choose_weights / weight_sum
+                next_n_iteration = self.rng.choice(self.iterate_r, p=choose_weights)
+                self.logger.info('random choosing next_n_iteration=%d. new_weights: %s. choose_weights: %s.'
+                                 % (next_n_iteration, new_weights, choose_weights))
+            else:
+                raise ValueError
+            return next_n_iteration
 
-            # # Update weight when the inner loop of hyperband is finished todo
-            # self.weight_update_id += 1
-            # if not self.use_bohb_strategy and \
-            #         self.update_enable and self.weight_update_id > self.s_max - self.skip_outer_loop:
-            #     self.update_weight()
-            #     new_weights = self.hist_weights[-1]     # caution the order of weights
-            #     if self.use_weight_bracket:
-            #         self.hb_bracket_id = self.rng.choice(range(len(self.hb_bracket_list)), p=new_weights)
-            #     else:
-            #         choose_next_bracket()
-            # else:
-            #     choose_next_bracket()
-            choose_next_bracket()
-
-            self.hb_iter_list = self.hb_bracket_list[self.hb_bracket_id]
-            self.logger.info('iteration list of next bracket: %s' % self.hb_iter_list)
-        return next_n_iteration
+        return super().get_next_n_iteration()
 
     def get_bo_candidates(self):
-        std_incumbent_value = np.min(std_normalization(self.target_y[self.iterate_r[-1]]))
-        # Update surrogate model in acquisition function.
-        self.acquisition_function.update(model=self.surrogate, eta=std_incumbent_value,
-                                         num_data=len(self.incumbent_configs))
+        if self.acq_optimizer_type == 'local_random':
+            std_incumbent_value = np.min(std_normalization(self.target_y[self.iterate_r[-1]]))
+            # Update surrogate model in acquisition function.
+            self.acquisition_function.update(model=self.surrogate, eta=std_incumbent_value,
+                                             num_data=len(self.incumbent_configs))
 
-        challengers = self.acq_optimizer.maximize(
-            runhistory=self.history_container,
-            num_points=5000,
-        )
-        return challengers.challengers
+            challengers = self.acq_optimizer.maximize(
+                runhistory=self.history_container,
+                num_points=5000,
+            )
+            return challengers.challengers
+        elif self.acq_optimizer_type == 'random':
+            best_index = np.argmin(self.incumbent_perfs)
+            best_config = self.incumbent_configs[best_index]
+            std_incumbent_value = np.min(std_normalization(self.incumbent_perfs))
+            # Update surrogate model in acquisition function.
+            self.acquisition_function.update(model=self.surrogate, eta=std_incumbent_value,
+                                             num_data=len(self.incumbent_configs))
+            candidates = self.acq_optimizer.maximize(best_config=best_config, batch_size=5000)
+            return candidates
+        else:
+            raise ValueError
 
     @staticmethod
     def calculate_preserving_order_num(y_pred, y_true):
@@ -247,11 +360,18 @@ class async_mqMFES(async_mqHyperband):
 
         max_r = self.iterate_r[-1]
         incumbent_configs = self.target_x[max_r]
+        if len(incumbent_configs) < 3:
+            return
         test_x = convert_configurations_to_array(incumbent_configs)
         test_y = np.array(self.target_y[max_r], dtype=np.float64)
 
         r_list = self.surrogate.surrogate_r
         K = len(r_list)
+
+        old_weights = list()
+        for i, r in enumerate(r_list):
+            _weight = self.surrogate.surrogate_weight[r]
+            old_weights.append(_weight)
 
         if len(test_y) >= 3:
             # Get previous weights
@@ -285,17 +405,28 @@ class async_mqMFES(async_mqHyperband):
                             preserving_order_p.append(preorder_num / pair_num)
                             preserving_order_nums.append(preorder_num)
 
+                self.logger.info('update weight preserving_order_p: %s' % preserving_order_p)
                 trans_order_weight = np.array(preserving_order_p)
                 power_sum = np.sum(np.power(trans_order_weight, self.power_num))
                 new_weights = np.power(trans_order_weight, self.power_num) / power_sum
 
             elif self.weight_method == 'rank_loss_prob':
+                t1 = time.time()
                 # For basic surrogate i=1:K-1.
                 mean_list, var_list = list(), list()
+                prob_list = list()
                 for i, r in enumerate(r_list[:-1]):
                     mean, var = self.surrogate.surrogate_container[r].predict(test_x)
                     mean_list.append(np.reshape(mean, -1))
                     var_list.append(np.reshape(var, -1))
+
+                    tmp_y = np.reshape(mean, -1)
+                    preorder_num, pair_num = self.calculate_preserving_order_num(tmp_y, test_y)
+                    prob_list.append(preorder_num / pair_num)
+                self.logger.info('update weight preserving_order prob_list: %s' % prob_list)
+
+                t2 = time.time()
+
                 sample_num = 100
                 min_probability_array = [0] * K
                 for _ in range(sample_num):
@@ -309,13 +440,13 @@ class async_mqMFES(async_mqHyperband):
 
                     fold_num = 5
                     # For basic surrogate i=K. cv
-                    if len(test_y) < 2 * fold_num:
+                    if len(test_y) < 2 * fold_num or self.increasing_weight:
                         order_preseving_nums.append(0)
                     else:
                         # 5-fold cross validation.
                         kfold = KFold(n_splits=fold_num)
                         cv_pred = np.array([0] * len(test_y))
-                        for train_idx, valid_idx in kfold.split(test_x):
+                        for train_idx, valid_idx in kfold.split(test_x):    # todo: reduce cost!!!
                             train_configs, train_y = test_x[train_idx], test_y[train_idx]
                             valid_configs, valid_y = test_x[valid_idx], test_y[valid_idx]
                             types, bounds = get_types(self.config_space)
@@ -329,21 +460,57 @@ class async_mqMFES(async_mqHyperband):
                     max_id = np.argmax(order_preseving_nums)
                     min_probability_array[max_id] += 1
                 new_weights = np.array(min_probability_array) / sample_num
+                t3 = time.time()
+                if t3 - t1 > 1:
+                    self.logger.info('update weight (rank loss prob) cost time: %.2fs, %.2fs'
+                                     % (t2 - t1, t3 - t2))
             else:
                 raise ValueError('Invalid weight method: %s!' % self.weight_method)
         else:
-            old_weights = list()
-            for i, r in enumerate(r_list):
-                _weight = self.surrogate.surrogate_weight[r]
-                old_weights.append(_weight)
-            new_weights = old_weights.copy()
+            new_weights = np.array(old_weights)
+
+        # non decreasing full observation weight
+        old_weights = np.asarray(old_weights)
+        new_weights = np.asarray(new_weights)
+        self.hist_weights_unadjusted.append(new_weights)
+        if self.non_decreasing_weight:
+            old_last_weight = old_weights[-1]
+            new_last_weight = new_weights[-1]
+            if new_last_weight < old_last_weight:
+                old_remain_weight = 1.0 - old_last_weight
+                new_remain_weight = 1.0 - new_last_weight
+                if new_remain_weight <= 1e-8:
+                    adjusted_new_weights = np.array([0.] * self.s_max + [1.], dtype=np.float64)
+                else:
+                    adjusted_new_weights = np.append(new_weights[:-1] / new_remain_weight * old_remain_weight,
+                                                     old_last_weight)
+                self.logger.info('[%s] %d-th. non_decreasing_weight: old_weights=%s, new_weights=%s, '
+                                 'adjusted_new_weights=%s.' % (self.weight_method, self.weight_changed_cnt,
+                                                               old_weights, new_weights, adjusted_new_weights))
+                new_weights = adjusted_new_weights
+        elif self.increasing_weight and len(test_y) >= 10:
+            s = 10
+            k = 0.025
+            a = 0.5
+            new_last_weight = a / (a + np.e ** (-(len(test_y) - s) * k))
+            new_remain_weight = 1.0 - new_last_weight
+            remain_weight = 1.0 - new_weights[-1]
+            if remain_weight <= 1e-8:
+                adjusted_new_weights = np.array([0.] * self.s_max + [1.], dtype=np.float64)
+            else:
+                adjusted_new_weights = np.append(new_weights[:-1] / remain_weight * new_remain_weight,
+                                                 new_last_weight)
+            self.logger.info('[%s] %d-th. increasing_weight: new_weights=%s, adjusted_new_weights=%s.'
+                             % (self.weight_method, self.weight_changed_cnt, new_weights, adjusted_new_weights))
+            new_weights = adjusted_new_weights
 
         self.logger.info('[%s] %d-th Updating weights: %s' % (
             self.weight_method, self.weight_changed_cnt, str(new_weights)))
 
         # Assign the weight to each basic surrogate.
-        for i, r in enumerate(r_list):
-            self.surrogate.surrogate_weight[r] = new_weights[i]
+        if not self.test_bohb:
+            for i, r in enumerate(r_list):
+                self.surrogate.surrogate_weight[r] = new_weights[i]
         self.weight_changed_cnt += 1
         # Save the weight data.
         self.hist_weights.append(new_weights)

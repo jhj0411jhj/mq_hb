@@ -359,10 +359,17 @@ class async_mqMFES_v32(async_mqHyperband):
             elif self.weight_method == 'rank_loss_prob':
                 # For basic surrogate i=1:K-1.
                 mean_list, var_list = list(), list()
+                prob_list = list()
                 for i, r in enumerate(r_list[:-1]):
                     mean, var = self.surrogate.surrogate_container[r].predict(test_x)
                     mean_list.append(np.reshape(mean, -1))
                     var_list.append(np.reshape(var, -1))
+
+                    tmp_y = np.reshape(mean, -1)
+                    preorder_num, pair_num = self.calculate_preserving_order_num(tmp_y, test_y)
+                    prob_list.append(preorder_num / pair_num)
+                self.logger.info('update weight preserving_order prob_list: %s' % prob_list)
+
                 sample_num = 100
                 min_probability_array = [0] * K
                 for _ in range(sample_num):
@@ -380,19 +387,21 @@ class async_mqMFES_v32(async_mqHyperband):
                         order_preseving_nums.append(0)
                     else:
                         # 5-fold cross validation.
-                        kfold = KFold(n_splits=fold_num)
-                        cv_pred = np.array([0] * len(test_y))
-                        for train_idx, valid_idx in kfold.split(test_x):
-                            train_configs, train_y = test_x[train_idx], test_y[train_idx]
-                            valid_configs, valid_y = test_x[valid_idx], test_y[valid_idx]
-                            types, bounds = get_types(self.config_space)
-                            _surrogate = RandomForestWithInstances(types=types, bounds=bounds)
-                            _surrogate.train(train_configs, train_y)
-                            _pred, _var = _surrogate.predict(valid_configs)
-                            sampled_pred = self.rng.normal(_pred.reshape(-1), _var.reshape(-1))
-                            cv_pred[valid_idx] = sampled_pred
-                        _num, _ = self.calculate_preserving_order_num(cv_pred, test_y)
-                        order_preseving_nums.append(_num)
+                        # kfold = KFold(n_splits=fold_num)
+                        # cv_pred = np.array([0] * len(test_y))
+                        # for train_idx, valid_idx in kfold.split(test_x):
+                        #     train_configs, train_y = test_x[train_idx], test_y[train_idx]
+                        #     valid_configs, valid_y = test_x[valid_idx], test_y[valid_idx]
+                        #     types, bounds = get_types(self.config_space)
+                        #     _surrogate = RandomForestWithInstances(types=types, bounds=bounds)
+                        #     _surrogate.train(train_configs, train_y)
+                        #     _pred, _var = _surrogate.predict(valid_configs)
+                        #     sampled_pred = self.rng.normal(_pred.reshape(-1), _var.reshape(-1))
+                        #     cv_pred[valid_idx] = sampled_pred
+                        # _num, _ = self.calculate_preserving_order_num(cv_pred, test_y)
+                        # order_preseving_nums.append(_num)
+                        assert self.increasing_weight is True
+                        order_preseving_nums.append(0)
                     max_id = np.argmax(order_preseving_nums)
                     min_probability_array[max_id] += 1
                 new_weights = np.array(min_probability_array) / sample_num

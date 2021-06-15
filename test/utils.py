@@ -70,6 +70,10 @@ def setup_exp(_dataset, n_jobs, runtime_limit, time_limit_per_trial):
         n_jobs = 1
         runtime_limit = 3600                # 1h
         time_limit_per_trial = 600          # 10min
+    elif _dataset == 'mfeat-fourier(1)':
+        n_jobs = 1
+        runtime_limit = 1800                # 30min
+        time_limit_per_trial = 300          # 5min
     else:
         print('[setup exp] dataset setup not found. use input settings.')
     print('[setup exp] dataset=%s, n_jobs=%d, runtime_limit=%d, time_limit_per_trial=%d'

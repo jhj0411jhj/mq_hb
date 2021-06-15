@@ -111,7 +111,15 @@ with timeit('load nasbench101'):
 with timeit('all'):
     for algo_name in mths:
         with timeit('%s %d %d' % (algo_name, start_id, rep)):
-            algo_class, parallel_strategy = mth_dict[algo_name]
+            mth_info = mth_dict[algo_name]
+            if len(mth_info) == 2:
+                algo_class, parallel_strategy = mth_info
+                algo_kwargs = dict()
+            elif len(mth_info) == 3:
+                algo_class, parallel_strategy, algo_kwargs = mth_info
+            else:
+                raise ValueError('error mth info: %s' % mth_info)
+
             print('===== start eval %s: rep=%d, runtime_limit=%d, time_limit_per_trial=%d'
                   % (dataset, rep, runtime_limit, time_limit_per_trial))
             for i in range(start_id, start_id + rep):
@@ -124,7 +132,6 @@ with timeit('all'):
                     method_str = '%s-n%d' % (algo_name, n_workers)
                 method_id = method_str + '-%s-%d-%s' % (dataset, seed, timestamp)
 
-                algo_kwargs = dict()
                 with timeit('%d %s' % (i, method_id)):
                     recorder = evaluate_simulation(
                         algo_class, algo_kwargs, method_id, n_workers, seed, parallel_strategy

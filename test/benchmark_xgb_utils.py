@@ -140,7 +140,10 @@ def run_exp(test_datasets, algo_class, algo_kwargs, algo_name, n_workers, parall
             seed = seeds[i]
 
             timestamp = time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime(time.time()))
-            method_str = '%s-n%d' % (algo_name, n_workers)
+            if R != 27:
+                method_str = '%s-%d-n%d' % (algo_name, R, n_workers)
+            else:
+                method_str = '%s-n%d' % (algo_name, n_workers)
             method_id = method_str + '-%s-%d-%s' % (dataset, seed, timestamp)
 
             # ip, port are filled in evaluate_parallel()

@@ -57,14 +57,19 @@ print(runtime_limit)
 for para in (ip, port, n_jobs, R, eta, n_workers, runtime_limit):
     assert para is not None
 
-algo_class, parallel_strategy = mth_dict[algo_name]
-
+mth_info = mth_dict[algo_name]
+if len(mth_info) == 2:
+    algo_class, parallel_strategy = mth_info
+    algo_kwargs = dict()
+elif len(mth_info) == 3:
+    algo_class, parallel_strategy, algo_kwargs = mth_info
+else:
+    raise ValueError('error mth info: %s' % mth_info)
 # objective_func, config_space, random_state, method_id, runtime_limit, time_limit_per_trial, ip, port
 # are filled in run_exp()
-algo_kwargs = dict(
-    R=R, eta=eta,
-    restart_needed=True,
-)
+algo_kwargs['R'] = R
+algo_kwargs['eta'] = eta
+algo_kwargs['restart_needed'] = True
 
 run_exp(dataset, algo_class, algo_kwargs, algo_name, n_workers, parallel_strategy,
         R, n_jobs, runtime_limit, time_limit_per_trial, start_id, rep, ip, port,

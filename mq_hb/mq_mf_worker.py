@@ -89,7 +89,8 @@ class mqmfWorker(object):
                                ref_id=ref_id,
                                early_stop=early_stop,
                                trial_state=trial_state,
-                               test_perf=test_perf)
+                               test_perf=test_perf,
+                               extra_conf=extra_conf)
             observation = [return_info, time_taken, trial_id, config]
 
             # Send result

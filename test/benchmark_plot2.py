@@ -14,32 +14,23 @@ import matplotlib.pyplot as plt
 
 from utils import setup_exp, descending, create_plot_points
 
-
-def get_mths(mths, dataset):
-    mths_dict = {
-        'censusincome': 'random-n8,hyperband-n8,bohb-n8,mfesv4-n8,ahb-n8,amfesv6-n8',
-        'covtype': 'random-n8,hyperband-n8,bohb-n8,mfes-n8,ahb-n8,amfesv6-n8',
-        'pokerhand': 'random-n8,hyperband-n8,bohb-n8,mfes-n8,ahb-n8,amfesv8-n8',
-        'HIGGS220w': 'random-n8,hyperband-n8,bohbv0-n8,mfesv4-n8,ahb-n8,amfesv8-n8',
-        'hepmass210w': 'random-n8,hyperband-n8,bohbv0-n8,mfesv4-n8,ahb-n8,amfesv10-n8',
-    }
-    if mths is None:
-        return mths_dict[dataset].split(',')
-    else:
-        return mths.split(',')
-
+#default_mths = 'random-n1,random-n3,smac,hyperband-n1,hyperband-n3,bohb-n1,bohb-n3,mfes-n1,mfes-n3'
+default_mths = 'random-n8,hyperband-n8,bohb-n8,mfesv4-n8,ahb-n8,amfesv6-n8,amfesv35-n8'
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', type=str)
-parser.add_argument('--mths', type=str, default=None)
+parser.add_argument('--mths', type=str, default=default_mths)
 parser.add_argument('--R', type=int, default=27)
 parser.add_argument('--runtime_limit', type=int)    # if you don't want to use default setup
+parser.add_argument('--model', type=str, default='xgb')
+parser.add_argument('--default_value', type=float, default=0.0)
 
 args = parser.parse_args()
 dataset = args.dataset
-mths = get_mths(args.mths, dataset)
+mths = args.mths.split(',')
 R = args.R
-model = 'xgb'
+model = args.model
+default_value = args.default_value
 
 
 def fetch_color_marker(m_list):
@@ -65,12 +56,14 @@ def fetch_color_marker(m_list):
             fill_values(name, 1)
         elif name.startswith('mfes'):
             fill_values(name, 5)
-        # elif name.startswith('asha'):
-        #     fill_values(name, 7)
-        elif name.startswith('ahb'):
+        elif name.startswith('asha'):
             fill_values(name, 7)
-        # elif name.startswith('abohb'):
-        #     fill_values(name, 8)
+        elif name.startswith('ahb'):
+            fill_values(name, 6)
+        elif name.startswith('abohb'):
+            fill_values(name, 3)
+        elif name.startswith('amfesv35') or name.startswith('amfesv32'):
+            fill_values(name, 8)
         elif name.startswith('amfes'):
             fill_values(name, 4)
         else:
@@ -88,47 +81,86 @@ def get_mth_legend(mth, show_mode=False):
         'bohb-n1': 'BOHB-n1',
         'mfes-n1': 'MFES-n1',
 
-        'random-n8': 'Random Search',
-        'hyperband-n8': 'Hyperband',
-        'bohb-n8': 'BOHB',
-        'mfes-n8': 'MFES-HB',
+        'random-n8': 'Random-n8',
+        'hyperband-n8': 'Hyperband-n8',
+        'bohb-n8': 'BOHB-n8',
+        'mfes-n8': 'MFES-n8',
+
+        'random-n3': 'Random-n3',
+        'hyperband-n3': 'Hyperband-n3',
+        'bohb-n3': 'BOHB-n3',
+        'mfes-n3': 'MFES-n3',
     }
+    if mth.startswith('abohb') and mth.endswith('-n4'):
+        mth = 'OURS-n4'
+    if mth.startswith('amfesv32') and mth.endswith('-n4'):
+        mth = 'A-BOHB-n4'
+
     if show_mode:
-        if mth.startswith('amfes') and mth.endswith('-n8'):
-            mth = 'A-MFES-HB'
+        if mth.startswith('amfesv35') and mth.endswith('-n8'):
+            #mth = 'AMFES-n8'
+            mth = 'OURS-n8'
+        elif mth.startswith('amfesv32') and mth.endswith('-n8'):
+            #mth = 'AMFES-n8'
+            mth = 'OURS-n8'
+        elif mth.startswith('amfes') and mth.endswith('-n8'):
+            #mth = 'AMFES-n8'
+            mth = 'OURS-B-n8'
+
+        if mth.startswith('amfesv35') and mth.endswith('-n4'):
+            mth = 'OURS-n4'
+        elif mth.startswith('amfesv32') and mth.endswith('-n4'):
+            mth = 'OURS-n4'
+        elif mth.startswith('amfes') and mth.endswith('-n4'):
+            mth = 'OURS-B-n4'
         if mth.startswith('mfes') and mth.endswith('-n8'):
-            mth = 'MFES-HB'
-        legend_dict['ahb-n1'] = 'ASHA-n1'
-        legend_dict['ahb-n8'] = 'ASHA'
-        legend_dict['bohbv0-n1'] = 'BOHB-n1'
-        legend_dict['bohbv0-n8'] = 'BOHB'
+            mth = 'MFES-n8'
+        if mth.startswith('asha') and mth.endswith('-n8'):
+            mth = 'ASHA-n8'
+        if mth.startswith('ahb') and mth.endswith('-n8'):
+            mth = 'AHB-n8'
+
+        if mth.startswith('ahb') and mth.endswith('-n4'):
+            mth = 'AHB-n4'
+        if mth.startswith('bohb') and mth.endswith('-n4'):
+            mth = 'BOHB-n4'
+        if mth.startswith('abohb') and mth.endswith('-n4'):
+            mth = 'A-BOHB-n4'
+
+
+
+
+        # legend_dict['ahb-n1'] = 'ASHA-n1'
+        # legend_dict['ahb-n8'] = 'ASHA-n8'
+        # legend_dict['bohbv0-n1'] = 'BOHB-n1'
+        # legend_dict['bohbv0-n8'] = 'BOHB-n8'
     return legend_dict.get(mth_lower, mth)
 
 
 def plot_setup(_dataset):
     if _dataset == 'covtype':
-        plt.ylim(1-0.937, 1-0.877)
+        plt.ylim(-0.937, -0.877)
         plt.xlim(0, runtime_limit+10)
     elif _dataset == 'codrna':
-        plt.ylim(1-0.9793, 1-0.9753)
+        plt.ylim(-0.9793, -0.9753)
         plt.xlim(0, runtime_limit+10)
     elif _dataset == 'kuaishou1':
-        plt.ylim(1-0.7717, 1-0.7709)
+        plt.ylim(-0.7717, -0.7709)
         plt.xlim(0, runtime_limit+1000)
     elif _dataset == 'kuaishou2':
-        plt.ylim(1-0.636, 1-0.611)
+        plt.ylim(-0.636, -0.611)
         plt.xlim(0, runtime_limit+1000)
     elif _dataset == 'pokerhand':
-        plt.ylim(1-1.001, 1-0.951)
+        plt.ylim(-1.001, -0.951)
         plt.xlim(0, runtime_limit+10)
     elif _dataset.startswith('HIGGS'):
-        plt.ylim(1-0.7555, 1-0.7485)
+        plt.ylim(-0.756, -0.746)
         plt.xlim(0, runtime_limit+10)
     elif _dataset.startswith('hepmass'):
-        plt.ylim(1-0.8755, 1-0.8725)
+        plt.ylim(-0.8755, -0.8725)
         plt.xlim(0, runtime_limit+10)
     elif _dataset.startswith('censusincome'):
-        plt.ylim(1-0.746, 1-0.738)
+        plt.ylim(-0.747, -0.737)
         plt.xlim(0, runtime_limit)
     elif _dataset == 'cifar10-valid':
         plt.ylim(-91.65, -90.85)
@@ -166,24 +198,28 @@ for mth in mths:
             with open(os.path.join(dir_path, file), 'rb') as f:
                 raw_recorder = pkl.load(f)
             recorder = []
+            cnt = 0
             for record in raw_recorder:
-                if record.get('n_iteration') is not None and record['n_iteration'] < R:
-                    print('error abandon record by n_iteration:', R, mth, record)
-                    continue
+                # if record.get('n_iteration') is not None and record['n_iteration'] < R:
+                #     print('error abandon record by n_iteration:', R, mth, record)
+                #     continue
                 if record['global_time'] > runtime_limit:
                     print('abandon record by runtime_limit:', runtime_limit, mth, record)
                     continue
+                if record['global_time'] < 30000:
+                    cnt+= 1
                 recorder.append(record)
             recorder.sort(key=lambda rec: rec['global_time'])
             # print([(rec['global_time'], rec['return_info']['loss']) for rec in recorder])
             print('new recorder len:', mth, len(recorder), len(raw_recorder))
+            #print('30000 cnt:', mth, cnt)
             timestamp = [rec['global_time'] for rec in recorder]
-            perf = descending([1 + rec['return_info']['loss'] for rec in recorder])
+            perf = descending([rec['return_info']['loss'] for rec in recorder])
             stats.append((timestamp, perf))
             # for debugging
             # if mth == 'smac':
             #     plt.plot(timestamp, perf, label=file)
-    x, m, s = create_plot_points(stats, 0, runtime_limit, point_num=point_num, default=1.0)
+    x, m, s = create_plot_points(stats, 0, runtime_limit, point_num=point_num, default=default_value)
     result[mth] = (x, m, s)
     # plot
     plt.plot(x, m, lw=lw, label=get_mth_legend(mth, show_mode=True),
@@ -220,28 +256,29 @@ for mth in mths:
         speedup = baseline_time / mth_time
         print("%s %s %.2f" % (mth, baseline, speedup))
 
+# print last val perf
+print('===== mth - last val perf =====')
+for mth in mths:
+    x, m, s = result[mth]
+    m = m[-1]
+    s = s[-1]
+    perfs = None
+    if dataset == 'kuaishou1':
+        print(dataset, mth, perfs, u'%.5f\u00B1%.5f' % (m, s))
+    elif dataset in ['cifar10', 'cifar10-valid', 'cifar100', 'ImageNet16-120']:
+        print(dataset, mth, perfs, u'%.2f\u00B1%.2f' % (m, s))
+    else:
+        print(dataset, mth, perfs, u'%.4f\u00B1%.4f' % (m, s))
 
-def get_title(dataset):
-    if dataset == 'censusincome':
-        return 'Census Income'
-    if dataset == 'covtype':
-        return 'Covertype'
-    if dataset == 'pokerhand':
-        return 'Poker Hand'
-    if dataset == 'HIGGS220w':
-        return 'HIGGS'
-    if dataset == 'hepmass210w':
-        return 'HEPMASS'
-    return dataset
-
+# plt.axhline(-0.849296, linestyle="--", color="b", lw=1, label="Default")
+# plt.ylim(-0.863, -0.844)
+# plt.xlim(0, runtime_limit+1000)
 
 # show plot
-#print(plt.rcParams['figure.figsize'])
 plt.legend(loc='upper right')
-plt.title(get_title(dataset), fontsize=20)
-plt.xlabel("Wall Clock Time (s)", fontsize=16)
-plt.ylabel("Validation Error", fontsize=16)
-plt.grid()
+plt.title(dataset, fontsize=16)
+plt.xlabel("Time elapsed (sec)", fontsize=16)
+plt.ylabel("Negative validation score", fontsize=16)
 plt.tight_layout()
-#plt.show()
-plt.savefig('logs/amfes_%s_n8_20210530.png' % (dataset), dpi=250)
+plt.grid()
+plt.show()
