@@ -65,7 +65,7 @@ class mqBaseFacade(object):
         self.time_limit_per_trial = time_limit_per_trial
         self.runtime_limit = runtime_limit
 
-        max_queue_len = max(300, max_queue_len)
+        max_queue_len = max(1000, max_queue_len)
         self.master_messager = MasterMessager(ip, port, authkey, max_queue_len, max_queue_len)
         self.sleep_time = sleep_time
 

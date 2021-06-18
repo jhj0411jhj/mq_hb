@@ -11,7 +11,7 @@ class mqRandomSearch(mqBaseFacade):
     def __init__(self, objective_func,
                  config_space: ConfigurationSpace,
                  R,
-                 n_workers=1,
+                 n_workers,
                  num_iter=10000,
                  random_state=1,
                  method_id='mqRandomSearch',
@@ -22,7 +22,7 @@ class mqRandomSearch(mqBaseFacade):
                  port=13579,
                  authkey=b'abc',
                  **kwargs):
-        max_queue_len = max(100, 3 * n_workers)  # conservative design
+        max_queue_len = max(1000, 3 * n_workers)  # conservative design
         super().__init__(objective_func, method_name=method_id,
                          restart_needed=restart_needed, time_limit_per_trial=time_limit_per_trial,
                          runtime_limit=runtime_limit,
@@ -33,12 +33,8 @@ class mqRandomSearch(mqBaseFacade):
         self.R = R
         self.n_workers = n_workers
         self.num_iter = num_iter
-        self.counter = 0
-        self.best_loss = np.inf
-        self.best_counter = -1
-        self.best_config = None
         self.incumbent_configs = []
-        self.incumbent_obj = []
+        self.incumbent_perfs = []
         self.logger.info('Unused kwargs: %s' % kwargs)
 
     def run(self):
@@ -65,14 +61,14 @@ class mqRandomSearch(mqBaseFacade):
         val_losses = [item['loss'] for item in ret_val]
 
         self.incumbent_configs.extend(configs)
-        self.incumbent_obj.extend(val_losses)
+        self.incumbent_perfs.extend(val_losses)
         self.add_stage_history(self.stage_id, self.global_incumbent)
         self.stage_id += 1
         # self.remove_immediate_model()
 
     def get_incumbent(self, num_inc=1):
-        assert (len(self.incumbent_obj) == len(self.incumbent_configs))
-        indices = np.argsort(self.incumbent_obj)
+        assert (len(self.incumbent_perfs) == len(self.incumbent_configs))
+        indices = np.argsort(self.incumbent_perfs)
         configs = [self.incumbent_configs[i] for i in indices[0:num_inc]]
-        targets = [self.incumbent_obj[i] for i in indices[0: num_inc]]
+        targets = [self.incumbent_perfs[i] for i in indices[0: num_inc]]
         return configs, targets

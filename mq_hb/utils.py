@@ -8,7 +8,7 @@ COMPLETED = 'completed'
 PROMOTED = 'promoted'
 
 
-def sample_configuration(configuration_space: ConfigurationSpace, excluded_configs: List[Configuration] = None,
+def sample_configuration(configuration_space: ConfigurationSpace, excluded_configs=None,
                          max_sample_cnt=1000):
     """
     sample one config not in excluded_configs
@@ -33,8 +33,8 @@ def sample_configuration(configuration_space: ConfigurationSpace, excluded_confi
     return config
 
 
-def sample_configurations(configuration_space: ConfigurationSpace, num: int,
-                          excluded_configs: List[Configuration] = None, max_sample_cnt=1000) -> List[Configuration]:
+def sample_configurations(configuration_space: ConfigurationSpace, num,
+                          excluded_configs=None, max_sample_cnt=1000) -> List[Configuration]:
     if excluded_configs is None:
         excluded_configs = set()
     if isinstance(excluded_configs, set):
@@ -60,7 +60,7 @@ def sample_configurations(configuration_space: ConfigurationSpace, num: int,
 
 
 def expand_configurations(configs: List[Configuration], configuration_space: ConfigurationSpace, num: int,
-                          excluded_configs: List[Configuration] = None, max_sample_cnt=1000):
+                          excluded_configs=None, max_sample_cnt=1000):
     if excluded_configs is None:
         excluded_configs = set()
     if isinstance(excluded_configs, set):

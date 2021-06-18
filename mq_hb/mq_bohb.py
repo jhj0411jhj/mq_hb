@@ -1,5 +1,6 @@
 from openbox.utils.config_space import ConfigurationSpace
 from openbox.core.sync_batch_advisor import SyncBatchAdvisor, SUCCESS
+from openbox.core.base import Observation
 from mq_hb.mq_hb import mqHyperband
 from mq_hb.utils import sample_configurations, expand_configurations
 
@@ -78,7 +79,8 @@ class mqBOHB(mqHyperband):
         # update config advisor
         for config, perf in zip(T, val_losses):
             objs = [perf]
-            observation = (config, SUCCESS, None, objs, None)   # config, trial_state, constraints, objs, elapsed_time
+            # config, trial_state, constraints, objs, elapsed_time
+            observation = Observation(config, SUCCESS, None, objs, None)
             self.config_advisor.update_observation(observation)
             self.logger.info('update observation: config=%s, perf=%f' % (str(config), perf))
         self.logger.info('%d observations updated. %d incumbent configs total.' % (len(T), len(self.incumbent_configs)))

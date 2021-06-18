@@ -42,7 +42,7 @@ class async_mqMFES(async_mqHyperband):
                  increasing_weight=True,
                  acq_optimizer='local_random',  # 'local_random', 'random'
                  use_weight_init=True,
-                 weight_init_method='proportional',  # 'proportional', 'pow'
+                 weight_init_choosing='proportional',  # 'proportional', 'pow', 'argmax', 'argmax2'
                  test_sh=False,
                  test_random=False,
                  test_bohb=False,
@@ -137,8 +137,8 @@ class async_mqMFES(async_mqHyperband):
         self.increasing_weight = increasing_weight
         assert not (self.non_decreasing_weight and self.increasing_weight)
         self.use_weight_init = use_weight_init
-        self.weight_init_method = weight_init_method
-        assert self.weight_init_method in ['proportional', 'pow']
+        self.weight_init_choosing = weight_init_choosing
+        assert self.weight_init_choosing in ['proportional', 'pow', 'argmax', 'argmax2']
         self.n_init_configs = np.array(
             [len(init_iter_list) for init_iter_list in self.hb_bracket_list],
             dtype=np.float64
@@ -280,7 +280,7 @@ class async_mqMFES(async_mqHyperband):
             return self.bracket[0]['n_iteration']
 
         if self.use_weight_init and len(self.incumbent_configs) >= 3 * 8:  # todo: replace 8 by full observation num
-            if self.weight_init_method == 'proportional':
+            if self.weight_init_choosing == 'proportional':
                 top_k = 2
                 new_weights = self.hist_weights_unadjusted[-1]
                 choose_weights = np.asarray(new_weights, dtype=np.float64) * self.n_init_configs
@@ -294,7 +294,7 @@ class async_mqMFES(async_mqHyperband):
                 self.logger.info('random choosing next_n_iteration=%d. unadjusted_weights: %s. '
                                  'n_init_configs: %s. choose_weights: %s.'
                                  % (next_n_iteration, new_weights, self.n_init_configs, choose_weights))
-            elif self.weight_init_method == 'pow':
+            elif self.weight_init_choosing == 'pow':
                 top_k = 2
                 new_weights = self.hist_weights_unadjusted[-1]
                 choose_weights = np.array(new_weights, dtype=np.float64) ** self.power_num
@@ -312,8 +312,23 @@ class async_mqMFES(async_mqHyperband):
                 next_n_iteration = self.rng.choice(self.iterate_r, p=choose_weights)
                 self.logger.info('random choosing next_n_iteration=%d. new_weights: %s. choose_weights: %s.'
                                  % (next_n_iteration, new_weights, choose_weights))
+            elif self.weight_init_choosing == 'argmax':
+                new_weights = self.hist_weights_unadjusted[-1]
+                choose_weights = np.asarray(new_weights, dtype=np.float64) * self.n_init_configs
+                choose_weights = choose_weights / np.sum(choose_weights)
+                idx = np.argmax(choose_weights).item()
+                next_n_iteration = self.iterate_r[idx]
+                self.logger.info('argmax choosing next_n_iteration=%d. new_weights: %s. '
+                                 'n_init_configs: %s. choose_weights: %s.'
+                                 % (next_n_iteration, new_weights, self.n_init_configs, choose_weights))
+            elif self.weight_init_choosing == 'argmax2':
+                new_weights = self.hist_weights_unadjusted[-1]
+                idx = np.argmax(new_weights).item()
+                next_n_iteration = self.iterate_r[idx]
+                self.logger.info('argmax2 choosing next_n_iteration=%d. new_weights: %s.'
+                                 % (next_n_iteration, new_weights))
             else:
-                raise ValueError
+                raise ValueError('Unknown weight_init_choosing: %s' % self.weight_init_choosing)
             return next_n_iteration
 
         return super().get_next_n_iteration()

@@ -24,7 +24,7 @@ class async_mqBaseFacade(object):
                  data_directory='data',
                  time_limit_per_trial=600,
                  runtime_limit=None,
-                 max_queue_len=300,
+                 max_queue_len=1000,
                  ip='',
                  port=13579,
                  authkey=b'abc',
@@ -68,7 +68,7 @@ class async_mqBaseFacade(object):
         self.runtime_limit = runtime_limit
         assert self.runtime_limit is not None
 
-        max_queue_len = max(300, max_queue_len)
+        max_queue_len = max(1000, max_queue_len)
         self.master_messager = MasterMessager(ip, port, authkey, max_queue_len, max_queue_len)
         self.sleep_time = sleep_time
 

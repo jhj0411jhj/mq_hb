@@ -50,8 +50,7 @@ def evaluate_parallel(algo_class, algo_kwargs, method_id, n_workers, dataset, se
         return_list.extend(algo.recorder)  # send to return list
 
     def worker_run(i):
-        #device = 'cuda:%d' % i  # gpu
-        device = 'cuda'  # caution!
+        device = 'cuda:%d' % i  # gpu
         if parallel_strategy == 'sync':
             worker = mqmfWorker_gpu(objective_function_gpu, device, ip, port)
         elif parallel_strategy == 'async':

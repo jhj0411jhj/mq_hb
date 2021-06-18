@@ -136,6 +136,12 @@ with timeit('%s all' % datasets):
                     else:
                         raise ValueError('error mth info: %s' % mth_info)
 
+                    from mq_hb.mq_random_search import mqRandomSearch
+from mq_hb.mq_bo import mqBO
+if algo_class in (mqRandomSearch, mqBO):
+    print('set algo_class n_workers:', n_workers)
+    algo_kwargs['n_workers'] = n_workers
+
                     print('===== start eval %s: rep=%d, runtime_limit=%d, time_limit_per_trial=%d'
                           % (dataset, rep, runtime_limit, time_limit_per_trial))
                     for i in range(start_id, start_id + rep):

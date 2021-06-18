@@ -45,7 +45,7 @@ class mqMFES_v4(mqBaseFacade):
                  ip='',
                  port=13579,
                  authkey=b'abc',):
-        max_queue_len = 3 * R  # conservative design
+        max_queue_len = 1000  # conservative design
         super().__init__(objective_func, method_name=method_id,
                          restart_needed=restart_needed, time_limit_per_trial=time_limit_per_trial,
                          runtime_limit=runtime_limit,

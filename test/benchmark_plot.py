@@ -8,6 +8,7 @@ python test/benchmark_plot.py --dataset covtype --R 27
 """
 import argparse
 import os
+import time
 import numpy as np
 import pickle as pkl
 import matplotlib.pyplot as plt
@@ -31,53 +32,6 @@ mths = args.mths.split(',')
 R = args.R
 model = args.model
 default_value = args.default_value
-
-
-def fetch_color_marker_old(m_list):
-    color_dict = dict()
-    marker_dict = dict()
-    color_list = ['purple', 'royalblue', 'green', 'brown', 'red', 'orange', 'yellowgreen', 'black', 'yellow']
-    markers = ['s', '^', '*', 'v', 'o', 'p', '2', 'x', 'd']
-
-    def fill_values(name, idx):
-        color_dict[name] = color_list[idx]
-        marker_dict[name] = markers[idx]
-
-    for name in m_list:
-        if name.startswith('random-n1'):
-            fill_values(name, 1)
-        elif name.startswith('random-n3'):
-            fill_values(name, 6)
-        elif name.startswith('smac'):
-            fill_values(name, 3)
-        elif name.startswith('hyperband-n1'):
-            fill_values(name, 5)
-        elif name.startswith('hyperband-n3'):
-            fill_values(name, 2)
-        elif name.startswith('bohb-n1'):
-            fill_values(name, 0)
-        elif name.startswith('bohb-n'):
-            fill_values(name, 4)
-        elif name.startswith('mfes-n1'):
-            fill_values(name, 8)
-        elif name.startswith('mfes-n'):
-            fill_values(name, 7)
-        elif name.startswith('amfes-n1'):
-            fill_values(name, 2)
-        elif name.startswith('amfes-n'):
-            fill_values(name, 1)
-        elif name.startswith('mfesv2-n1'):
-            fill_values(name, 3)
-        elif name.startswith('mfesv2-n3'):
-            fill_values(name, 5)
-        elif name.startswith('mfesv3-n1'):
-            fill_values(name, 2)
-        elif name.startswith('mfesv3-n3'):
-            fill_values(name, 1)
-        else:
-            print('color not defined:', name)
-            fill_values(name, 1)
-    return color_dict, marker_dict
 
 
 def fetch_color_marker(m_list):
@@ -130,10 +84,6 @@ def get_mth_legend(mth, show_mode=False):
         'bohb-n8': 'BOHB-n8',
         'mfes-n8': 'MFES-n8',
 
-        'random-n3': 'Random-n3',
-        'hyperband-n3': 'Hyperband-n3',
-        'bohb-n3': 'BOHB-n3',
-        'mfes-n3': 'MFES-n3',
     }
     if show_mode:
         if mth.startswith('amfes') and mth.endswith('-n8'):

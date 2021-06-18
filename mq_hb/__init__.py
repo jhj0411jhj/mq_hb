@@ -1,4 +1,5 @@
 from mq_hb.mq_random_search import mqRandomSearch
+from mq_hb.mq_bo import mqBO
 from mq_hb.mq_sh import mqSuccessiveHalving
 from mq_hb.mq_hb import mqHyperband
 from mq_hb.mq_bohb import mqBOHB
@@ -6,6 +7,7 @@ from mq_hb.mq_bohb_v0 import mqBOHB_v0
 from mq_hb.mq_bohb_v2 import mqBOHB_v2
 from mq_hb.mq_mfes import mqMFES
 from mq_hb.mq_mfes_v4 import mqMFES_v4
+from mq_hb.async_mq_random import async_mqRandomSearch
 from mq_hb.async_mq_sh import async_mqSuccessiveHalving
 from mq_hb.async_mq_sh_v0 import async_mqSuccessiveHalving_v0
 from mq_hb.async_mq_sh_v2 import async_mqSuccessiveHalving_v2
@@ -35,6 +37,7 @@ from mq_hb.async_mq_mfes_v35 import async_mqMFES_v35
 
 mth_dict = dict(
     random=(mqRandomSearch, 'sync'),
+    bo=(mqBO, 'sync'),
     sh=(mqSuccessiveHalving, 'sync'),
     hyperband=(mqHyperband, 'sync'),
     bohb=(mqBOHB, 'sync'),
@@ -42,6 +45,7 @@ mth_dict = dict(
     bohbv2=(mqBOHB_v2, 'sync'),  # tpe
     mfes=(mqMFES, 'sync'),
     mfesv4=(mqMFES_v4, 'sync'),
+    arandom=(async_mqRandomSearch, 'async'),
     asha=(async_mqSuccessiveHalving, 'async'),
     ashav0=(async_mqSuccessiveHalving_v0, 'async'),  # origin asha
     ashav2=(async_mqSuccessiveHalving_v2, 'async'),  # promotion cycle
@@ -71,19 +75,19 @@ mth_dict = dict(
                                           non_decreasing_weight=False,
                                           increasing_weight=True, )),
     amfesv35=(async_mqMFES, 'async', dict(use_weight_init=True,
-                                          weight_init_method='pow',
+                                          weight_init_choosing='pow',
                                           weight_method='rank_loss_prob',
                                           non_decreasing_weight=False,
                                           increasing_weight=True, )),
     amfese1=(async_mqMFES, 'async', dict(use_weight_init=True,
-                                         weight_init_method='proportional',
+                                         weight_init_choosing='proportional',
                                          weight_method='rank_loss_p_norm',
                                          non_decreasing_weight=False,
                                          increasing_weight=True,
                                          test_random=True,
                                          test_original_asha=True, )),  # ahb with bracket selection
     amfese2=(async_mqMFES, 'async', dict(use_weight_init=True,
-                                         weight_init_method='proportional',
+                                         weight_init_choosing='proportional',
                                          weight_method='rank_loss_p_norm',
                                          non_decreasing_weight=False,
                                          increasing_weight=True,
@@ -95,9 +99,18 @@ mth_dict = dict(
                                          increasing_weight=True,
                                          test_sh=True, )),  # amfes + sh
     amfesv20=(async_mqMFES, 'async', dict(use_weight_init=True,
-                                          weight_init_method='proportional',
+                                          weight_init_choosing='proportional',
                                           weight_method='rank_loss_p_norm',
                                           non_decreasing_weight=False,
-                                          increasing_weight=True,
-                                          test_bohb=True, )),
+                                          increasing_weight=True, )),
+    amfesv21=(async_mqMFES, 'async', dict(use_weight_init=True,
+                                          weight_init_choosing='argmax',
+                                          weight_method='rank_loss_p_norm',
+                                          non_decreasing_weight=False,
+                                          increasing_weight=True, )),
+    amfesv22=(async_mqMFES, 'async', dict(use_weight_init=True,
+                                          weight_init_choosing='argmax2',
+                                          weight_method='rank_loss_p_norm',
+                                          non_decreasing_weight=False,
+                                          increasing_weight=True, )),
 )

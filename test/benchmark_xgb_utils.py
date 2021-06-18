@@ -131,6 +131,7 @@ def run_exp(test_datasets, algo_class, algo_kwargs, algo_name, n_workers, parall
             R, n_jobs, runtime_limit, time_limit_per_trial, start_id, rep, ip, port,
             eta=None, pre_sample=False, run_test=True):
     check_datasets(test_datasets)
+    model_name = 'xgb'
     for dataset in test_datasets:
         # setup
         n_jobs, runtime_limit, time_limit_per_trial = setup_exp(dataset, n_jobs, runtime_limit, time_limit_per_trial)
@@ -159,7 +160,7 @@ def run_exp(test_datasets, algo_class, algo_kwargs, algo_name, n_workers, parall
                 parallel_strategy, n_jobs, R, eta=eta, pre_sample=pre_sample, run_test=run_test,
             )
 
-            dir_path = 'data/benchmark_xgb/%s-%d/%s/' % (dataset, runtime_limit, method_str)
+            dir_path = 'data/benchmark_%s/%s-%d/%s/' % (model_name, dataset, runtime_limit, method_str)
             file_name = 'record_%s.pkl' % (method_id,)
             try:
                 if not os.path.exists(dir_path):
@@ -171,12 +172,12 @@ def run_exp(test_datasets, algo_class, algo_kwargs, algo_name, n_workers, parall
             print(dir_path, file_name, 'saved!', flush=True)
 
             if rep > 1 or len(test_datasets) > 1:
-                time.sleep(300)
+                sleep_time = min(runtime_limit/5, 1800)
+                print('sleep %.2fs now!' % sleep_time, flush=True)
+                time.sleep(sleep_time)
 
         try:
-            model_name = 'xgb'
-            mths = [method_str]
-            remove_partial(model_name, dataset, mths, runtime_limit, R)
-            get_incumbent(model_name, dataset, mths, runtime_limit)
+            remove_partial(model_name, dataset, [method_str], runtime_limit, R)
+            get_incumbent(model_name, dataset, [method_str], runtime_limit)
         except Exception as e:
             print('benchmark process record failed: %s' % (traceback.format_exc(),))
