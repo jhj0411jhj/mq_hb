@@ -77,8 +77,6 @@ from mq_hb.mq_bo import mqBO
 if algo_class in (mqRandomSearch, mqBO):
     print('set algo_class n_workers:', n_workers)
     algo_kwargs['n_workers'] = n_workers
-    print(algo_kwargs)
-    exit()
 
 run_exp(test_datasets, algo_class, algo_kwargs, algo_name, n_workers, parallel_strategy,
         R, n_jobs, runtime_limit, time_limit_per_trial, start_id, rep, ip, port,

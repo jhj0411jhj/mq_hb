@@ -9,7 +9,7 @@ from ConfigSpace import ConfigurationSpace, UniformIntegerHyperparameter, Unifor
 from openbox.utils.constants import MAXINT
 
 from fcnet_util import get_path_by_config
-from fcnet_dataset import ImageDataset, ResumableRandomSampler
+from fcnet_dataset import ImageDataset, SubsetSequentialampler
 
 import torch
 from torch import nn
@@ -111,7 +111,7 @@ def mf_objective_func_gpu(config, n_resource, extra_conf, device, total_resource
 
         else:
             cur_step_num = 0
-            train_sampler = ResumableRandomSampler(image_data.train_indices)
+            train_sampler = SubsetSequentialampler(image_data.train_indices)
 
         train_loader = DataLoader(dataset=image_data.train_dataset, batch_size=config['batch_size'],
                                   sampler=train_sampler, num_workers=4)
@@ -182,7 +182,7 @@ def mf_objective_func_gpu(config, n_resource, extra_conf, device, total_resource
         optimizer_ = optimizer
         step_num_ = int(step_num) + int(cur_step_num)
         # scheduler_ = scheduler
-        train_sampler_ = image_data.train_sampler
+        train_sampler_ = train_loader.sampler
 
     except Exception as e:
         import traceback

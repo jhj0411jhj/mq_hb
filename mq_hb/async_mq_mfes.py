@@ -10,12 +10,14 @@ from mq_hb.utils import RUNNING, COMPLETED, PROMOTED
 from mq_hb.utils import sample_configuration
 from mq_hb.utils import minmax_normalization, std_normalization
 from mq_hb.surrogate.rf_ensemble import RandomForestEnsemble
+from mq_hb.surrogate.gp_ensemble import GaussianProcessEnsemble
 from mq_hb.acq_maximizer.ei_optimization import RandomSampling
 
 from openbox.utils.util_funcs import get_types
 from openbox.utils.config_space import ConfigurationSpace
 from openbox.acquisition_function.acquisition import EI
 from openbox.surrogate.base.rf_with_instances import RandomForestWithInstances
+from openbox.surrogate.base.build_gp import create_gp_model
 from openbox.acq_maximizer.ei_optimization import InterleavedLocalAndRandomSearch, RandomSearch
 from openbox.acq_maximizer.random_configuration_chooser import ChooserProb
 from openbox.utils.config_space.util import convert_configurations_to_array
@@ -40,6 +42,7 @@ class async_mqMFES(async_mqHyperband):
                  set_promotion_threshold=True,
                  non_decreasing_weight=False,
                  increasing_weight=True,
+                 surrogate_type='prf',  # 'prf', 'gp'
                  acq_optimizer='local_random',  # 'local_random', 'random'
                  use_weight_init=True,
                  weight_init_choosing='proportional',  # 'proportional', 'pow', 'argmax', 'argmax2'
@@ -90,8 +93,17 @@ class async_mqMFES(async_mqHyperband):
         self.logger.info("Initialize weight to %s" % self.init_weight)
         types, bounds = get_types(config_space)
 
-        self.surrogate = RandomForestEnsemble(types, bounds, self.s_max, self.eta,
-                                              self.init_weight, self.fusion_method)
+        self.rng = np.random.RandomState(seed=self.seed)
+
+        self.surrogate_type = surrogate_type
+        if self.surrogate_type == 'prf':
+            self.surrogate = RandomForestEnsemble(types, bounds, self.s_max, self.eta,
+                                                  self.init_weight, self.fusion_method)
+        elif self.surrogate_type == 'gp':
+            self.surrogate = GaussianProcessEnsemble(config_space, types, bounds, self.s_max, self.eta,
+                                                     self.init_weight, self.fusion_method, self.rng)
+        else:
+            raise ValueError('Unknown surrogate type: %s' % self.surrogate_type)
         self.acquisition_function = EI(model=self.surrogate)
 
         self.iterate_id = 0
@@ -113,7 +125,6 @@ class async_mqMFES(async_mqHyperband):
         self.sls_max_steps = None
         self.n_sls_iterations = 5
         self.sls_n_steps_plateau_walk = 10
-        self.rng = np.random.RandomState(seed=self.seed)
         self.acq_optimizer_type = acq_optimizer
         if self.acq_optimizer_type == 'local_random':
             self.acq_optimizer = InterleavedLocalAndRandomSearch(
@@ -412,7 +423,12 @@ class async_mqMFES(async_mqHyperband):
                                 train_configs, train_y = test_x[train_idx], test_y[train_idx]
                                 valid_configs, valid_y = test_x[valid_idx], test_y[valid_idx]
                                 types, bounds = get_types(self.config_space)
-                                _surrogate = RandomForestWithInstances(types=types, bounds=bounds)
+                                if self.surrogate_type == 'prf':
+                                    _surrogate = RandomForestWithInstances(types=types, bounds=bounds)
+                                elif self.surrogate_type == 'gp':
+                                    _surrogate = create_gp_model('gp', self.config_space, types, bounds, self.rng)
+                                else:
+                                    raise ValueError('Unknown surrogate type: %s' % self.surrogate_type)
                                 _surrogate.train(train_configs, train_y)
                                 pred, _ = _surrogate.predict(valid_configs)
                                 cv_pred[valid_idx] = pred.reshape(-1)
@@ -465,7 +481,12 @@ class async_mqMFES(async_mqHyperband):
                             train_configs, train_y = test_x[train_idx], test_y[train_idx]
                             valid_configs, valid_y = test_x[valid_idx], test_y[valid_idx]
                             types, bounds = get_types(self.config_space)
-                            _surrogate = RandomForestWithInstances(types=types, bounds=bounds)
+                            if self.surrogate_type == 'prf':
+                                _surrogate = RandomForestWithInstances(types=types, bounds=bounds)
+                            elif self.surrogate_type == 'gp':
+                                _surrogate = create_gp_model('gp', self.config_space, types, bounds, self.rng)
+                            else:
+                                raise ValueError('Unknown surrogate type: %s' % self.surrogate_type)
                             _surrogate.train(train_configs, train_y)
                             _pred, _var = _surrogate.predict(valid_configs)
                             sampled_pred = self.rng.normal(_pred.reshape(-1), _var.reshape(-1))

@@ -49,6 +49,10 @@ def create_resource_gp_model(model_type, config_space, types, bounds, rng):
         prior=LognormalPrior(mean=0.0, sigma=1.0, rng=rng),
     )
 
+    # resource feature
+    types = np.hstack((types, [0])).astype(int)
+    bounds = np.vstack((bounds, [[0.0, 1.0]])).astype(float)
+
     cont_dims = np.nonzero(types == 0)[0].astype(np.int)
     cat_dims = np.nonzero(types != 0)[0].astype(np.int)
 
@@ -67,13 +71,6 @@ def create_resource_gp_model(model_type, config_space, types, bounds, rng):
             operate_on=cat_dims,
         )
 
-    resource_kernel = Matern(
-        np.ones([1]),
-        [(np.exp(-6.754111155189306), np.exp(0.0858637988771976))],
-        nu=2.5,
-        operate_on=np.array([len(types)])
-    )
-
     noise_kernel = WhiteKernel(
         noise_level=1e-8,
         noise_level_bounds=(np.exp(-25), np.exp(2)),
@@ -82,18 +79,16 @@ def create_resource_gp_model(model_type, config_space, types, bounds, rng):
 
     if len(cont_dims) > 0 and len(cat_dims) > 0:
         # both
-        kernel = cov_amp * ((exp_kernel * ham_kernel) * resource_kernel) + noise_kernel
+        kernel = cov_amp * (exp_kernel * ham_kernel) + noise_kernel
     elif len(cont_dims) > 0 and len(cat_dims) == 0:
         # only cont
-        kernel = cov_amp * (exp_kernel * resource_kernel) + noise_kernel
+        kernel = cov_amp * exp_kernel + noise_kernel
     elif len(cont_dims) == 0 and len(cat_dims) > 0:
         # only cont
-        kernel = cov_amp * (ham_kernel * resource_kernel) + noise_kernel
+        kernel = cov_amp * ham_kernel + noise_kernel
     else:
         raise ValueError()
 
-    types = np.hstack((types, [0])).astype(int)
-    bounds = np.vstack((bounds, [[0.0, 1.0]])).astype(float)
     # seed = rng.randint(0, 2 ** 20)
     if model_type == 'gp_mcmc':
         n_mcmc_walkers = 3 * len(kernel.theta)

@@ -143,14 +143,17 @@ def objective_function(args, reporter):
         config["wd"] = wd
 
         ts_now = time.time()
-        eval_time = ts_start - ts_now
-        print('you report at epoch %s' % epoch)
+        eval_time = ts_now - ts_start
         if epoch in [0, 2, 8, 26]:
+            print('you report at epoch %s' % epoch)
             reporter(
                 epoch=epoch + 1,
                 performance=float(curr_best),
                 eval_time=eval_time,
-                time_step=ts_now, **config)
+                time_step=ts_now,
+                extra_info=123,
+                **config,
+            )
 
 
 def callback(training_history, start_timestamp, config_history, state_dict):
@@ -271,3 +274,4 @@ if __name__ == "__main__":
 
     # final training history
     training_history = scheduler.training_history
+    print(training_history)

@@ -4,7 +4,11 @@ import warnings
 import torch
 from math import ceil, log
 import numpy as np
-from sklearn.metrics.scorer import accuracy_scorer
+try:
+    from sklearn.metrics.scorer import accuracy_scorer
+except ModuleNotFoundError:
+    from sklearn.metrics._scorer import accuracy_scorer
+    print('from sklearn.metrics._scorer import accuracy_scorer')
 from resnet_model import get_estimator
 from resnet_util import get_path_by_config, get_transforms
 from resnet_dataset import ImageDataset
@@ -53,12 +57,12 @@ def mf_objective_func_gpu(config, n_resource, extra_conf, device, total_resource
         if not os.path.exists(config_model_path):
             raise ValueError('not initial_run but config_model_path not exists. check if exists duplicated configs '
                              'and saved model were removed.')
-        estimator.epoch_num = ceil(estimator.epoch_num * epoch_ratio) - ceil(
-            estimator.epoch_num * epoch_ratio / eta)
+        estimator.epoch_num = ceil(estimator.max_epoch * epoch_ratio) - ceil(
+            estimator.max_epoch * epoch_ratio / eta)
         estimator.load_path = config_model_path
         print(estimator.epoch_num)
     else:
-        estimator.epoch_num = ceil(estimator.epoch_num * epoch_ratio)
+        estimator.epoch_num = ceil(estimator.max_epoch * epoch_ratio)
 
     try:
         score = dl_holdout_validation(estimator, scorer, image_data, random_state=1)
@@ -76,7 +80,7 @@ def mf_objective_func_gpu(config, n_resource, extra_conf, device, total_resource
         state = {'model': estimator.model.state_dict(),
                  'optimizer': estimator.optimizer_.state_dict(),
                  'scheduler': estimator.scheduler.state_dict(),
-                 'epoch_num': estimator.epoch_num}
+                 'cur_epoch_num': estimator.cur_epoch_num}
         torch.save(state, save_path)
 
     try:
@@ -98,7 +102,7 @@ def mf_objective_func_gpu(config, n_resource, extra_conf, device, total_resource
     #         state = {'model': estimator.model.state_dict(),
     #                  'optimizer': estimator.optimizer_.state_dict(),
     #                  'scheduler': estimator.scheduler.state_dict(),
-    #                  'epoch_num': estimator.epoch_num,
+    #                  'cur_epoch_num': estimator.cur_epoch_num,
     #                  'early_stop': estimator.early_stop}
     #         torch.save(state, model_path)
     #         print("Model saved to %s" % model_path)

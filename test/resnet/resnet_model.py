@@ -161,12 +161,12 @@ class BaseImgClassificationNeuralNetwork(BaseNeuralNetwork):
             self.model.load_state_dict(checkpoint['model'])
             optimizer.load_state_dict(checkpoint['optimizer'])
             scheduler.load_state_dict(checkpoint['scheduler'])
-            self.cur_epoch_num = checkpoint['epoch_num']
+            self.cur_epoch_num = checkpoint['cur_epoch_num']
             # early_stop = checkpoint['early_stop']
             # if early_stop.if_early_stop:
             #     print("Early stopped!")
             #     self.optimizer_ = optimizer
-            #     self.epoch_num = int(self.epoch_num) + int(self.cur_epoch_num)
+            #     self.cur_epoch_num = int(self.cur_epoch_num) + int(self.epoch_num)
             #     self.scheduler = scheduler
             #     self.early_stop = early_stop
             #     return self
@@ -218,7 +218,8 @@ class BaseImgClassificationNeuralNetwork(BaseNeuralNetwork):
             scheduler.step()
 
         self.optimizer_ = optimizer
-        self.epoch_num = int(self.epoch_num) + int(self.cur_epoch_num)
+        self.cur_epoch_num = int(self.cur_epoch_num) + int(self.epoch_num)
+        self.epoch_num = 0
         self.scheduler = scheduler
 
         return self

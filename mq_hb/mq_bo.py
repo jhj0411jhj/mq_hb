@@ -11,7 +11,7 @@ from openbox.core.base import Observation
 
 class mqBO(mqBaseFacade):
     """
-    parallel Bayesian Optimization (sync)
+    synchronous parallel Bayesian Optimization (using OpenBox)
     """
     def __init__(self, objective_func,
                  config_space: ConfigurationSpace,
@@ -96,7 +96,7 @@ class mqBO(mqBaseFacade):
             # config, trial_state, constraints, objs, elapsed_time
             observation = Observation(config, SUCCESS, None, objs, None)
             self.config_advisor.update_observation(observation)
-            self.logger.info('update observation: config=%s, perf=%f' % (str(config), perf))
+            self.logger.info('update BO observation: config=%s, perf=%f' % (str(config), perf))
 
     def get_bo_candidates(self):
         num_config = self.n_workers

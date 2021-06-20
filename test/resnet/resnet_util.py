@@ -181,8 +181,11 @@ def resnet1202(num_classes):
     return ResNet(depth=1202, num_classes=num_classes)
 
 
-def get_configuration_id(config):
-    data_dict = config.get_dictionary()
+def get_configuration_id(config, is_dict=False):
+    if is_dict:
+        data_dict = config
+    else:
+        data_dict = config.get_dictionary()
     data_list = []
     for key, value in sorted(data_dict.items(), key=lambda t: t[0]):
         if isinstance(value, float):
@@ -193,8 +196,8 @@ def get_configuration_id(config):
     return sha.hexdigest()
 
 
-def get_path_by_config(config):
-    return '%s.pt' % get_configuration_id(config)
+def get_path_by_config(config, is_dict=False):
+    return '%s.pt' % get_configuration_id(config, is_dict=is_dict)
 
 
 def get_transforms(image_size=None):

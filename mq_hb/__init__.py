@@ -8,6 +8,7 @@ from mq_hb.mq_bohb_v2 import mqBOHB_v2
 from mq_hb.mq_mfes import mqMFES
 from mq_hb.mq_mfes_v4 import mqMFES_v4
 from mq_hb.async_mq_random import async_mqRandomSearch
+from mq_hb.async_mq_bo import async_mqBO
 from mq_hb.async_mq_sh import async_mqSuccessiveHalving
 from mq_hb.async_mq_sh_v0 import async_mqSuccessiveHalving_v0
 from mq_hb.async_mq_sh_v2 import async_mqSuccessiveHalving_v2
@@ -46,6 +47,7 @@ mth_dict = dict(
     mfes=(mqMFES, 'sync'),
     mfesv4=(mqMFES_v4, 'sync'),
     arandom=(async_mqRandomSearch, 'async'),
+    abo=(async_mqBO, 'async'),
     asha=(async_mqSuccessiveHalving, 'async'),
     ashav0=(async_mqSuccessiveHalving_v0, 'async'),  # origin asha
     ashav2=(async_mqSuccessiveHalving_v2, 'async'),  # promotion cycle
@@ -113,4 +115,16 @@ mth_dict = dict(
                                           weight_method='rank_loss_p_norm',
                                           non_decreasing_weight=False,
                                           increasing_weight=True, )),
+    amfesgpv1=(async_mqMFES, 'async', dict(use_weight_init=True,
+                                           weight_init_choosing='proportional',
+                                           weight_method='rank_loss_p_norm',
+                                           non_decreasing_weight=False,
+                                           increasing_weight=True,
+                                           surrogate_type='gp', )),
+    amfesgpv2=(async_mqMFES, 'async', dict(use_weight_init=True,
+                                           weight_init_choosing='argmax2',
+                                           weight_method='rank_loss_p_norm',
+                                           non_decreasing_weight=False,
+                                           increasing_weight=True,
+                                           surrogate_type='gp', )),
 )

@@ -131,6 +131,9 @@ def plot_setup(_dataset):
     elif _dataset == 'ImageNet16-120':
         plt.ylim(-47.0, -45.0)
         plt.xlim(0, runtime_limit)
+    elif _dataset == 'mfeat-fourier(1)':
+        plt.ylim(-0.835, -0.810)
+        plt.xlim(0, runtime_limit)
 
 
 print('start', dataset)
@@ -232,8 +235,9 @@ for mth in mths:
 
 # show plot
 plt.legend(loc='upper right')
-plt.title(dataset, fontsize=16)
-plt.xlabel("Time elapsed (sec)", fontsize=16)
-plt.ylabel("Negative validation score", fontsize=16)
+plt.title("%s on %s" % (model, dataset), fontsize=16)
+plt.xlabel("Wall Clock Time (sec)", fontsize=16)
+plt.ylabel("Validation Error", fontsize=16)
 plt.tight_layout()
+plt.grid()
 plt.show()

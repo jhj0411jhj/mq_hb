@@ -127,8 +127,7 @@ def run_exp(dataset, algo_class, algo_kwargs, algo_name, n_workers, parallel_str
             time.sleep(3600)
 
     try:
-        mths = [method_str]
-        remove_partial(model, dataset, mths, runtime_limit, R)
-        get_incumbent(model, dataset, mths, runtime_limit)
+        remove_partial(model, dataset, [method_str], runtime_limit, R)
+        get_incumbent(model, dataset, [method_str], runtime_limit)
     except Exception as e:
         print('benchmark process record failed: %s' % (traceback.format_exc(),))
