@@ -62,6 +62,7 @@ parser.add_argument('--n_workers', type=int)        # must set for saving result
 parser.add_argument('--rep', type=int, default=1)
 parser.add_argument('--start_id', type=int, default=0)
 parser.add_argument('--data_path', type=str, default='../nas_data/NAS-Bench-201-v1_1-096897.pth')
+parser.add_argument('--simulation_factor', type=int, default=10)  # simulation sleep time factor
 
 args = parser.parse_args()
 
@@ -74,7 +75,7 @@ rep = args.rep
 start_id = args.start_id
 data_path = args.data_path
 
-simulation_factor = 10  # simulation sleep time factor
+simulation_factor = args.simulation_factor
 print("simulation_factor:", simulation_factor)
 # set runtime_limit
 if args.timeout == 0:
