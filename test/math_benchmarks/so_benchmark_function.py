@@ -47,10 +47,10 @@ class BaseSingleObjectiveProblem:
 
     @staticmethod
     def get_config_dict(config, optimizer='smac'):
-        if optimizer == 'smac':
-            config_dict = config.get_dictionary()
-        elif optimizer == 'tpe':
+        if optimizer == 'tpe' or isinstance(config, dict):
             config_dict = config
+        elif optimizer == 'smac':
+            config_dict = config.get_dictionary()
         else:
             raise ValueError('Unknown optimizer %s' % optimizer)
         return config_dict

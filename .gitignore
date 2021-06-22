@@ -34,3 +34,6 @@ datasets/
 smac3-output*
 
 ks/
+test/benchmark_plot2.py
+test/benchmark_plot_new.py
+test/benchmark_plot_template*
