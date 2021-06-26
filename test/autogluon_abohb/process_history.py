@@ -25,8 +25,10 @@ R = args.R
 runtime_limit = args.time
 model = args.model
 simulation_factor = args.simulation_factor
-if model not in ('nasbench101', 'nasbench201'):
+if model not in ('nasbench101', 'nasbench201', 'math'):
     simulation_factor = 1
+else:
+    print('simulation factor:', simulation_factor)
 for para in (dataset, runtime_limit):
     assert para is not None
 
@@ -59,15 +61,20 @@ for mth in mths:
 
                     time_step = history_dict.pop('time_step')
                     performance = history_dict.pop('performance')
-                    test_perf = history_dict.pop('test_perf')
+                    test_perf = history_dict.pop('test_perf', None)
                     eval_time = history_dict.pop('eval_time')
                     history_dict.pop('terminated')
                     history_dict.pop('bracket')
 
+                    runtime = (time_step - start_time)
+                    if runtime > runtime_limit:
+                        print('abandon record by runtime:', runtime, runtime_limit)
+                        continue
+
                     record = {
                         'time_consumed': eval_time * simulation_factor,
                         'configuration': history_dict,
-                        'global_time': (time_step - start_time) * simulation_factor,
+                        'global_time': runtime * simulation_factor,
                         'n_iteration': epoch,
                         'return_info': {
                             'loss': -performance,    # minimize

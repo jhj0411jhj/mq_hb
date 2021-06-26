@@ -99,7 +99,7 @@ def get_mth_legend(mth, show_mode=False):
 
 def plot_setup(_dataset):
     if _dataset == 'covtype':
-        plt.ylim(-0.937, -0.877)
+        plt.ylim(-0.940, -0.880)
         plt.xlim(0, runtime_limit+10)
     elif _dataset == 'codrna':
         plt.ylim(-0.9793, -0.9753)
@@ -143,7 +143,7 @@ if args.runtime_limit is not None:
     runtime_limit = args.runtime_limit
 plot_setup(dataset)
 color_dict, marker_dict = fetch_color_marker(mths)
-point_num = 10000
+point_num = 300
 lw = 2
 markersize = 6
 markevery = int(point_num / 10)

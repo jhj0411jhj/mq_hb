@@ -35,6 +35,7 @@ from mq_hb.mq_mfes_v7 import mqMFES_v7
 from mq_hb.mq_mfes_v8 import mqMFES_v8
 from mq_hb.async_mq_mfes_v32 import async_mqMFES_v32
 from mq_hb.async_mq_mfes_v35 import async_mqMFES_v35
+from mq_hb.async_mq_mfes_v24 import async_mqMFES_v24
 
 mth_dict = dict(
     random=(mqRandomSearch, 'sync'),
@@ -100,6 +101,16 @@ mth_dict = dict(
                                          non_decreasing_weight=False,
                                          increasing_weight=True,
                                          test_sh=True, )),  # amfes + sh
+    amfesv18=(async_mqMFES, 'async', dict(set_promotion_threshold=False,
+                                          use_weight_init=True,
+                                          weight_init_choosing='proportional',
+                                          weight_method='rank_loss_p_norm',
+                                          non_decreasing_weight=False,
+                                          increasing_weight=True, )),
+    amfesv19=(async_mqMFES, 'async', dict(use_weight_init=False,
+                                          weight_method='rank_loss_p_norm',
+                                          non_decreasing_weight=False,
+                                          increasing_weight=True, )),
     amfesv20=(async_mqMFES, 'async', dict(use_weight_init=True,
                                           weight_init_choosing='proportional',
                                           weight_method='rank_loss_p_norm',
@@ -127,4 +138,30 @@ mth_dict = dict(
                                            non_decreasing_weight=False,
                                            increasing_weight=True,
                                            surrogate_type='gp', )),
+    amfesv23=(async_mqMFES, 'async', dict(init_weight=[1.0, 0, 0, 0],  # todo
+                                          use_weight_init=True,
+                                          weight_init_choosing='proportional',
+                                          weight_method='rank_loss_p_norm',
+                                          non_decreasing_weight=False,
+                                          increasing_weight=True, )),
+    amfesv24=(async_mqMFES_v24, 'async'),   # stage asha
+    # median imputation
+    amfesm1=(async_mqMFES, 'async', dict(use_weight_init=True,
+                                         weight_init_choosing='proportional',
+                                         weight_method='rank_loss_p_norm',
+                                         non_decreasing_weight=False,
+                                         increasing_weight=True,
+                                         median_imputation='top')),
+    amfesm2=(async_mqMFES, 'async', dict(use_weight_init=True,
+                                         weight_init_choosing='proportional',
+                                         weight_method='rank_loss_p_norm',
+                                         non_decreasing_weight=False,
+                                         increasing_weight=True,
+                                         median_imputation='corresponding')),
+    amfesm3=(async_mqMFES, 'async', dict(use_weight_init=True,
+                                         weight_init_choosing='proportional',
+                                         weight_method='rank_loss_p_norm',
+                                         non_decreasing_weight=False,
+                                         increasing_weight=True,
+                                         median_imputation='all')),
 )

@@ -27,6 +27,7 @@ parser.add_argument('--n_jobs', type=int, default=4)
 parser.add_argument('--ip', type=str, default='127.0.0.1')
 parser.add_argument('--port', type=int, default=0)
 parser.add_argument('--n_workers', type=int)        # must set
+parser.add_argument('--max_local_workers', type=int, default=8)
 
 parser.add_argument('--runtime_limit', type=int, default=60)
 parser.add_argument('--time_limit_per_trial', type=int, default=600)
@@ -45,6 +46,7 @@ n_jobs = args.n_jobs                                # changed according to datas
 ip = args.ip
 port = args.port
 n_workers = args.n_workers  # Caution: must set for saving result to different dirs
+max_local_workers = args.max_local_workers
 
 runtime_limit = args.runtime_limit                  # changed according to dataset
 time_limit_per_trial = args.time_limit_per_trial    # changed according to dataset
@@ -80,4 +82,4 @@ if algo_class in (mqRandomSearch, mqBO):
 
 run_exp(test_datasets, algo_class, algo_kwargs, algo_name, n_workers, parallel_strategy,
         R, n_jobs, runtime_limit, time_limit_per_trial, start_id, rep, ip, port,
-        eta=eta, pre_sample=False, run_test=True)
+        eta=eta, pre_sample=False, run_test=True, max_local_workers=max_local_workers)

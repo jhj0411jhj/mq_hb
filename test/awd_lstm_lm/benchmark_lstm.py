@@ -1,7 +1,7 @@
 """
 example cmdline:
 
-python test/resnet/benchmark_lstm.py --mth hyperband --R 27 --n_workers 4 --rep 1 --start_id 0
+python test/awd_lstm_lm/benchmark_lstm.py --mth hyperband --R 27 --n_workers 4 --rep 1 --start_id 0
 
 """
 

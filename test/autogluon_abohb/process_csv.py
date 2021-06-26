@@ -25,8 +25,10 @@ R = args.R
 runtime_limit = args.time
 model = args.model
 simulation_factor = args.simulation_factor
-if model not in ('nasbench101', 'nasbench201'):
+if model not in ('nasbench101', 'nasbench201', 'math'):
     simulation_factor = 1
+else:
+    print('simulation factor:', simulation_factor)
 for para in (dataset, runtime_limit):
     assert para is not None
 
@@ -54,8 +56,12 @@ for mth in mths:
                 # time_step = row['time_step']
                 runtime = row['runtime']
                 performance = row['performance']
-                test_perf = row['test_perf']
+                test_perf = row['test_perf'] if 'test_perf' in row else None
                 eval_time = row['eval_time']
+
+                if runtime > runtime_limit:
+                    print('abandon record by runtime:', runtime, runtime_limit)
+                    continue
 
                 record = {
                     'time_consumed': eval_time * simulation_factor,

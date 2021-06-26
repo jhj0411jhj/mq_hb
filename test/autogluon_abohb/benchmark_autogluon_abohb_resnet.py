@@ -58,7 +58,7 @@ parser.add_argument('--store_results_period', type=int, default=100,
                     help='If specified, results are stored in intervals of '
                          'this many seconds (they are always stored at '
                          'the end)')
-parser.add_argument('--scheduler', type=str, default='hyperband_stopping',
+parser.add_argument('--scheduler', type=str, default='hyperband_promotion',
                     choices=['hyperband_stopping', 'hyperband_promotion'],
                     help='Asynchronous scheduler type. In case of doubt leave it to the default')
 parser.add_argument('--reduction_factor', type=int, default=3,
@@ -251,6 +251,7 @@ def evaluate(hyperband_type, method_id, seed, dir_path):
                                                 brackets=args.brackets,
                                                 checkpoint=None,
                                                 searcher=args.searcher,  # Defines searcher for new configurations
+                                                search_options=dict(random_seed=seed, first_is_default=False),
                                                 dist_ip_addrs=dist_ip_addrs,
                                                 training_history_callback=callback,
                                                 training_history_callback_delta_secs=args.store_results_period,
@@ -261,6 +262,11 @@ def evaluate(hyperband_type, method_id, seed, dir_path):
                                                 grace_period=args.min_resource_level,
                                                 random_seed=seed,
                                                 )
+    # set config space seed
+    scheduler.searcher.gp_searcher.configspace_ext.hp_ranges_ext.config_space.seed(seed)
+    scheduler.searcher.gp_searcher.configspace_ext.hp_ranges.config_space.seed(seed)
+    scheduler.searcher.gp_searcher.hp_ranges.config_space.seed(seed)
+    # run
     scheduler.run()
     scheduler.join_jobs()
 

@@ -15,6 +15,9 @@ from utils import load_data, setup_exp, check_datasets, seeds
 from benchmark_process_record import remove_partial, get_incumbent
 
 
+MAX_LOCAL_WORKERS = 8
+
+
 def mf_objective_func(config, n_resource, extra_conf,
                       total_resource, x_train, x_val, x_test, y_train, y_val, y_test,
                       n_jobs, run_test=True):
@@ -129,7 +132,9 @@ def evaluate_parallel(algo_class, algo_kwargs, method_id, n_workers, dataset, se
 
 def run_exp(test_datasets, algo_class, algo_kwargs, algo_name, n_workers, parallel_strategy,
             R, n_jobs, runtime_limit, time_limit_per_trial, start_id, rep, ip, port,
-            eta=None, pre_sample=False, run_test=True):
+            eta=None, pre_sample=False, run_test=True, max_local_workers=MAX_LOCAL_WORKERS):
+    if n_workers > max_local_workers:
+        print('Caution: n_workers=%d, max_local_workers=%d' % (n_workers, max_local_workers))
     check_datasets(test_datasets)
     model_name = 'xgb'
     for dataset in test_datasets:
@@ -155,8 +160,9 @@ def run_exp(test_datasets, algo_class, algo_kwargs, algo_name, n_workers, parall
             algo_kwargs['runtime_limit'] = runtime_limit
             algo_kwargs['time_limit_per_trial'] = time_limit_per_trial
 
+            n_local_workers = min(n_workers, max_local_workers)
             recorder = evaluate_parallel(
-                algo_class, algo_kwargs, method_id, n_workers, dataset, seed, ip, port,
+                algo_class, algo_kwargs, method_id, n_local_workers, dataset, seed, ip, port,
                 parallel_strategy, n_jobs, R, eta=eta, pre_sample=pre_sample, run_test=run_test,
             )
 
