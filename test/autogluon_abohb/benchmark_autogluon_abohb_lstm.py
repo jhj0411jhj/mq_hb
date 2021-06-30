@@ -63,7 +63,7 @@ parser.add_argument('--store_results_period', type=int, default=100,
                     help='If specified, results are stored in intervals of '
                          'this many seconds (they are always stored at '
                          'the end)')
-parser.add_argument('--scheduler', type=str, default='hyperband_stopping',
+parser.add_argument('--scheduler', type=str, default='hyperband_promotion',
                     choices=['hyperband_stopping', 'hyperband_promotion'],
                     help='Asynchronous scheduler type. In case of doubt leave it to the default')
 parser.add_argument('--reduction_factor', type=int, default=3,

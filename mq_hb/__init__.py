@@ -9,6 +9,7 @@ from mq_hb.mq_mfes import mqMFES
 from mq_hb.mq_mfes_v4 import mqMFES_v4
 from mq_hb.async_mq_random import async_mqRandomSearch
 from mq_hb.async_mq_bo import async_mqBO
+from mq_hb.async_mq_ea import async_mqEA
 from mq_hb.async_mq_sh import async_mqSuccessiveHalving
 from mq_hb.async_mq_sh_v0 import async_mqSuccessiveHalving_v0
 from mq_hb.async_mq_sh_v2 import async_mqSuccessiveHalving_v2
@@ -49,6 +50,8 @@ mth_dict = dict(
     mfesv4=(mqMFES_v4, 'sync'),
     arandom=(async_mqRandomSearch, 'async'),
     abo=(async_mqBO, 'async'),
+    aea=(async_mqEA, 'async'),  # Asynchronous Evolutionary Algorithm
+    aeav2=(async_mqEA, 'async', dict(strategy='oldest')),  # Asynchronous Evolutionary Algorithm
     asha=(async_mqSuccessiveHalving, 'async'),
     ashav0=(async_mqSuccessiveHalving_v0, 'async'),  # origin asha
     ashav2=(async_mqSuccessiveHalving_v2, 'async'),  # promotion cycle
@@ -145,6 +148,24 @@ mth_dict = dict(
                                           non_decreasing_weight=False,
                                           increasing_weight=True, )),
     amfesv24=(async_mqMFES_v24, 'async'),   # stage asha
+    amfesv25=(async_mqMFES, 'async', dict(use_weight_init=True,
+                                          weight_init_choosing='proportional',
+                                          weight_method='rank_loss_p_norm',
+                                          non_decreasing_weight=False,
+                                          increasing_weight=True,
+                                          test_original_asha=True, )),    # test original asha + mfes
+    amfesv26=(async_mqMFES, 'async', dict(use_weight_init=True,
+                                          weight_init_choosing='proportional',
+                                          weight_method='rank_loss_p_norm',
+                                          non_decreasing_weight=False,
+                                          increasing_weight=True,
+                                          rand_prob=0.1, )),    # test rand prob 0.1
+    amfesv27=(async_mqMFES, 'async', dict(use_weight_init=True,
+                                          weight_init_choosing='proportional',
+                                          weight_method='rank_loss_p_norm',
+                                          non_decreasing_weight=False,
+                                          increasing_weight=True,
+                                          rand_prob=0.2, )),    # test rand prob 0.2
     # median imputation
     amfesm1=(async_mqMFES, 'async', dict(use_weight_init=True,
                                          weight_init_choosing='proportional',

@@ -214,6 +214,9 @@ class BaseImgClassificationNeuralNetwork(BaseNeuralNetwork):
                     val_avg_loss /= num_val_samples
                     val_avg_acc /= num_val_samples
                     print('Epoch %d: Val loss %.4f, val acc %.4f' % (epoch, val_avg_loss, val_avg_acc))
+                    if not hasattr(self, 'val_perf_list'):  # for plotting curve
+                        self.val_perf_list = list()
+                    self.val_perf_list.append([epoch, float(val_avg_loss), float(val_avg_acc)])
 
             scheduler.step()
 
@@ -264,14 +267,18 @@ class BaseImgClassificationNeuralNetwork(BaseNeuralNetwork):
                     prediction = np.concatenate((prediction, logits.to('cpu').detach().numpy()), 0)
         return np.argmax(prediction, axis=-1)
 
-    def score(self, dataset, metric, batch_size=None):
+    def score(self, dataset, metric, batch_size=None, run_test=False):
         if not self.model:
             raise ValueError("Model not fitted!")
         batch_size = self.batch_size if batch_size is None else batch_size
         if isinstance(dataset, Dataset):
             loader = DataLoader(dataset=dataset, batch_size=batch_size, num_workers=NUM_WORKERS)
         else:
-            if not dataset.subset_sampler_used:
+            if run_test:
+                print('score using test dataset.')
+                loader = DataLoader(dataset=dataset.test_dataset, batch_size=batch_size,
+                                    num_workers=NUM_WORKERS)
+            elif not dataset.subset_sampler_used:
                 loader = DataLoader(dataset=dataset.val_dataset, batch_size=batch_size, num_workers=NUM_WORKERS)
             else:
                 loader = DataLoader(dataset=dataset.train_for_val_dataset, batch_size=batch_size,

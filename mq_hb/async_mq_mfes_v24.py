@@ -49,6 +49,7 @@ class async_mqMFES_v24(async_mqHyperband):
                  acq_optimizer='local_random',  # 'local_random', 'random'
                  use_weight_init=True,
                  weight_init_choosing='proportional',  # 'proportional', 'pow', 'argmax', 'argmax2'
+                 median_imputation=None,  # None, 'top', 'corresponding', 'all'
                  test_sh=False,
                  test_random=False,
                  test_bohb=False,
@@ -158,6 +159,12 @@ class async_mqMFES_v24(async_mqHyperband):
             dtype=np.float64
         )
 
+        # median imputation
+        self.median_imputation = median_imputation
+        self.configs_running_dict = dict()
+        self.all_configs_running = set()
+        assert self.median_imputation in [None, 'top', 'corresponding', 'all']
+
     def create_bracket(self):
         """
         bracket : list of rungs
@@ -212,6 +219,46 @@ class async_mqMFES_v24(async_mqHyperband):
 
         return True
 
+    def get_job(self):
+        next_config, next_n_iteration, next_extra_conf = super().get_job()
+        # for median imputation
+        if self.median_imputation is not None:
+            start_time = time.time()
+            r = int(next_n_iteration)
+            if r not in self.configs_running_dict.keys():
+                self.configs_running_dict[r] = set()
+            self.configs_running_dict[r].add(next_config)
+            self.all_configs_running.add(next_config)
+
+            if self.median_imputation == 'corresponding':
+                self.train_surrogate(self.surrogate, r, median_imputation=True)
+            elif self.median_imputation == 'top':
+                # self.train_surrogate(self.surrogate, self.iterate_r[-1], median_imputation=True, all_impute=True)
+                pass    # refit when update_observation
+            elif self.median_imputation == 'all':
+                pass    # refit when update_observation
+            else:
+                raise ValueError('Unknown median_imputation: %s' % self.median_imputation)
+
+            self.logger.info('get_job median_imputation cost %.2fs.' % (time.time() - start_time))
+
+        return next_config, next_n_iteration, next_extra_conf
+
+    def train_surrogate(self, surrogate, n_iteration: int, median_imputation: bool, all_impute=False):
+        if median_imputation:
+            if all_impute:
+                configs_running = list(self.all_configs_running)
+            else:
+                configs_running = list(self.configs_running_dict[n_iteration])
+            value_imputed = np.median(self.target_y[n_iteration])
+            configs_train = self.target_x[n_iteration] + configs_running
+            results_train = self.target_y[n_iteration] + [value_imputed] * len(configs_running)
+        else:
+            configs_train = self.target_x[n_iteration]
+            results_train = self.target_y[n_iteration]
+        results_train = np.array(std_normalization(results_train), dtype=np.float64)
+        surrogate.train(convert_configurations_to_array(configs_train), results_train, r=n_iteration)
+
     def update_observation(self, config, perf, n_iteration):
         rung_id = self.get_rung_id(self.bracket, n_iteration)
 
@@ -229,14 +276,29 @@ class async_mqMFES_v24(async_mqHyperband):
 
         n_iteration = int(n_iteration)
 
-        configs_running = list()
-        for _config in self.bracket[rung_id]['configs']:
-            if _config not in self.target_x[n_iteration]:
-                configs_running.append(_config)
-        value_imputed = np.median(self.target_y[n_iteration])
-
         self.target_x[n_iteration].append(config)
         self.target_y[n_iteration].append(perf)
+
+        if self.median_imputation is not None:
+            self.configs_running_dict[n_iteration].remove(config)
+            self.all_configs_running.remove(config)
+
+        # Refit the ensemble surrogate model.
+        start_time = time.time()
+        if self.median_imputation is None:
+            self.train_surrogate(self.surrogate, n_iteration, median_imputation=False)
+        elif self.median_imputation == 'corresponding':
+            self.train_surrogate(self.surrogate, n_iteration, median_imputation=True)
+        elif self.median_imputation == 'top':
+            if n_iteration != self.iterate_r[-1]:
+                self.train_surrogate(self.surrogate, n_iteration, median_imputation=False)
+            self.train_surrogate(self.surrogate, self.iterate_r[-1], median_imputation=True, all_impute=True)
+        elif self.median_imputation == 'all':
+            for r in self.iterate_r:
+                self.train_surrogate(self.surrogate, r, median_imputation=True, all_impute=True)
+        else:
+            raise ValueError('Unknown median_imputation: %s' % self.median_imputation)
+        self.logger.info('update_observation training surrogate cost %.2fs.' % (time.time() - start_time))
 
         if n_iteration == self.R:
             self.incumbent_configs.append(config)
@@ -248,12 +310,6 @@ class async_mqMFES_v24(async_mqHyperband):
             if self.update_enable and len(self.incumbent_configs) >= 8:  # todo: replace 8 by full observation num
                 self.weight_update_id += 1
                 self.update_weight()
-
-        # Refit the ensemble surrogate model. todo: no median
-        configs_train = self.target_x[n_iteration]
-        results_train = self.target_y[n_iteration]
-        results_train = np.array(std_normalization(results_train), dtype=np.float64)
-        self.surrogate.train(convert_configurations_to_array(configs_train), results_train, r=n_iteration)
 
         if len(self.incumbent_configs) >= 3 * 8:
             self.test_original_asha = False     # v24
@@ -406,6 +462,22 @@ class async_mqMFES_v24(async_mqHyperband):
             old_weights.append(_weight)
 
         if len(test_y) >= 3:
+            # refit surrogate model without median imputation
+            if self.median_imputation is None:
+                test_surrogate = self.surrogate
+            else:
+                types, bounds = get_types(self.config_space)
+                if self.surrogate_type == 'prf':
+                    test_surrogate = RandomForestEnsemble(types, bounds, self.s_max, self.eta,
+                                                          old_weights, self.fusion_method)
+                elif self.surrogate_type == 'gp':
+                    test_surrogate = GaussianProcessEnsemble(self.config_space, types, bounds, self.s_max, self.eta,
+                                                             old_weights, self.fusion_method, self.rng)
+                else:
+                    raise ValueError('Unknown surrogate type: %s' % self.surrogate_type)
+                for r in self.iterate_r:
+                    self.train_surrogate(test_surrogate, r, median_imputation=False)
+
             # Get previous weights
             if self.weight_method == 'rank_loss_p_norm':
                 preserving_order_p = list()
@@ -413,7 +485,7 @@ class async_mqMFES_v24(async_mqHyperband):
                 for i, r in enumerate(r_list):
                     fold_num = 5
                     if i != K - 1:
-                        mean, var = self.surrogate.surrogate_container[r].predict(test_x)   # todo check median imp!!!
+                        mean, var = test_surrogate.surrogate_container[r].predict(test_x)
                         tmp_y = np.reshape(mean, -1)
                         preorder_num, pair_num = self.calculate_preserving_order_num(tmp_y, test_y)
                         preserving_order_p.append(preorder_num / pair_num)
@@ -453,7 +525,7 @@ class async_mqMFES_v24(async_mqHyperband):
                 mean_list, var_list = list(), list()
                 prob_list = list()
                 for i, r in enumerate(r_list[:-1]):
-                    mean, var = self.surrogate.surrogate_container[r].predict(test_x)
+                    mean, var = test_surrogate.surrogate_container[r].predict(test_x)
                     mean_list.append(np.reshape(mean, -1))
                     var_list.append(np.reshape(var, -1))
 

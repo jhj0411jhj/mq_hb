@@ -37,3 +37,7 @@ ks/
 test/benchmark_plot2.py
 test/benchmark_plot_new*
 test/benchmark_plot_template*
+test/test.py
+test/convert_latex_table.py
+
+*.pdf

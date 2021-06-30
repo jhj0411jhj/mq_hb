@@ -148,7 +148,7 @@ lw = 2
 markersize = 6
 markevery = int(point_num / 10)
 std_scale = 0.3
-alpha = 0.2
+alpha = 0.15
 
 plot_list = []
 legend_list = []

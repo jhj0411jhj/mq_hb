@@ -122,7 +122,7 @@ def mf_objective_func_gpu(config, n_resource, extra_conf, device, total_resource
     return result
 
 
-def dl_holdout_validation(estimator, scorer, dataset, random_state=1, **kwargs):
+def dl_holdout_validation(estimator, scorer, dataset, random_state=1, run_test=False, **kwargs):
     start_time = time.time()
     with warnings.catch_warnings():
         # ignore all caught warnings
@@ -131,7 +131,7 @@ def dl_holdout_validation(estimator, scorer, dataset, random_state=1, **kwargs):
         if 'profile_epoch' in kwargs or 'profile_iter' in kwargs:
             return time.time() - start_time
         else:
-            return scorer._sign * estimator.score(dataset, scorer._score_func)
+            return scorer._sign * estimator.score(dataset, scorer._score_func, run_test=run_test)
 
 
 if __name__ == '__main__':

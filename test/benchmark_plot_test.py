@@ -33,53 +33,6 @@ model = args.model
 default_value = args.default_value
 
 
-def fetch_color_marker_old(m_list):
-    color_dict = dict()
-    marker_dict = dict()
-    color_list = ['purple', 'royalblue', 'green', 'brown', 'red', 'orange', 'yellowgreen', 'black', 'yellow']
-    markers = ['s', '^', '*', 'v', 'o', 'p', '2', 'x', 'd']
-
-    def fill_values(name, idx):
-        color_dict[name] = color_list[idx]
-        marker_dict[name] = markers[idx]
-
-    for name in m_list:
-        if name.startswith('random-n1'):
-            fill_values(name, 1)
-        elif name.startswith('random-n3'):
-            fill_values(name, 6)
-        elif name.startswith('smac'):
-            fill_values(name, 3)
-        elif name.startswith('hyperband-n1'):
-            fill_values(name, 5)
-        elif name.startswith('hyperband-n3'):
-            fill_values(name, 2)
-        elif name.startswith('bohb-n1'):
-            fill_values(name, 0)
-        elif name.startswith('bohb-n'):
-            fill_values(name, 4)
-        elif name.startswith('mfes-n1'):
-            fill_values(name, 8)
-        elif name.startswith('mfes-n'):
-            fill_values(name, 7)
-        elif name.startswith('amfes-n1'):
-            fill_values(name, 2)
-        elif name.startswith('amfes-n'):
-            fill_values(name, 1)
-        elif name.startswith('mfesv2-n1'):
-            fill_values(name, 3)
-        elif name.startswith('mfesv2-n3'):
-            fill_values(name, 5)
-        elif name.startswith('mfesv3-n1'):
-            fill_values(name, 2)
-        elif name.startswith('mfesv3-n3'):
-            fill_values(name, 1)
-        else:
-            print('color not defined:', name)
-            fill_values(name, 1)
-    return color_dict, marker_dict
-
-
 def fetch_color_marker(m_list):
     color_dict = dict()
     marker_dict = dict()
@@ -190,12 +143,12 @@ if args.runtime_limit is not None:
     runtime_limit = args.runtime_limit
 plot_setup(dataset)
 color_dict, marker_dict = fetch_color_marker(mths)
-point_num = 10000
+point_num = 300
 lw = 2
 markersize = 6
 markevery = int(point_num / 10)
-std_scale = 0.3
-alpha = 0.2
+std_scale = 0.5
+alpha = 0.15
 
 plot_list = []
 legend_list = []
@@ -277,7 +230,7 @@ print('===== mth - last test perf =====')
 for mth in mths:
     x, m, s = result[mth]
     m = m[-1]
-    s = s[-1]
+    s = s[-1] * std_scale  # Caution!
     perfs = None
     if dataset == 'kuaishou1':
         print(dataset, mth, perfs, u'%.5f\u00B1%.5f' % (m, s))
@@ -286,9 +239,8 @@ for mth in mths:
     else:
         print(dataset, mth, perfs, u'%.4f\u00B1%.4f' % (m, s))
 
-# plt.axhline(-0.849296, linestyle="--", color="b", lw=1, label="Default")
-# plt.ylim(-0.863, -0.844)
-# plt.xlim(0, runtime_limit+1000)
+if std_scale != 1:
+    print('=== Caution: std_scale=%f' % std_scale)
 
 # show plot
 plt.legend(loc='upper right')
