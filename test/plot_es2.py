@@ -10,6 +10,8 @@ import seaborn as sns
 import pylab
 from math import ceil
 from scipy.interpolate import make_interp_spline
+from brokenaxes import brokenaxes
+
 
 # sns.set_style(style='whitegrid')
 
@@ -62,6 +64,15 @@ def plot_single():
     data = process_record(sort=sort)
     print('len data:', len(data))
 
+    plt.subplots_adjust(top=0.96, right=0.99, left=0.095, bottom=0.25)
+    bax = brokenaxes(xlims=((1, 93), (195, total_x)),  # 设置x轴裂口范围
+                     # ylims=((0, 0.28), (0.4, 2)),  # 设置y轴裂口范围
+                     # hspace=0.25,  # y轴裂口宽度
+                     wspace=0.05,  # x轴裂口宽度
+                     despine=False,  # 是否y轴只显示一个裂口
+                     diag_color='black',  # 裂口斜线颜色
+                     )
+
     x = np.linspace(1, total_x, num=total_x)
     color_list = ['orange', 'rosybrown', 'royalblue', 'green', 'red', 'burlywood', 'cadetblue', 'maroon', 'hotpink',
                   'mediumpurple', 'gold']
@@ -88,40 +99,27 @@ def plot_single():
             # y_smooth = spline(x[:max_x], item, xnew)
             # y_smooth = make_interp_spline(x[:max_x], item, xnew)
             y_smooth = make_interp_spline(x[:max_x], item)(xnew)
-        plt.plot(xnew, y_smooth, color=color_list[index], lw=3)
+        #plt.plot(xnew, y_smooth, color=color_list[index], lw=3)
+        bax.plot(xnew, y_smooth, color=color_list[index], lw=3)
         index += 1
         index %= len(color_list)
         # plt.plot(x[:len(item)], item)
     print('last index:', index)
-    plt.xlabel('\\textbf{Training resource (epochs)}', fontsize=22)
-    plt.ylabel('\\textbf{Validation error}', fontsize=22)
+
+    # plt.xlabel('\\textbf{Training resource (epochs)}', fontsize=22)
+    # plt.ylabel('\\textbf{Validation error}', fontsize=22)
+    bax.set_xlabel('\\textbf{Training resource (epochs)}', fontsize=20)
+    bax.set_ylabel('\\textbf{Validation error}', fontsize=20)
 
     xi = total_x
     for i in range(s_max):
         xi = ceil(xi / eta)
-        plt.axvline(xi, linestyle="--", color="black", lw=1)
+        #plt.axvline(xi, linestyle="--", color="black", lw=1)
+        bax.axvline(xi, linestyle="--", color="black", lw=1)
         print('xi', xi)
 
-    # plt.axvline(9*4, linestyle="--", color="cadetblue", lw=2)
-    # plt.axvline(27*4, linestyle="--", color="cadetblue", lw=2)
-    # plt.axvline(81*4, linestyle="--", color="cadetblue", lw=2)
-
-    # plt.annotate('\\textbf{1st early stop: 9 low-fidelity measurements in $D_1$}', xy=(36, 0.3), xycoords='data',
-    #              xytext=(+10, +30), textcoords='offset points', fontsize=15,
-    #              arrowprops=dict(arrowstyle="->", connectionstyle="arc3,rad=.2"))
-    #
-    # plt.annotate('\\textbf{2nd early stop: 3 low-fidelity measurements in $D_2$}', xy=(27*4, 0.2), xycoords='data',
-    #              xytext=(+10, +30), textcoords='offset points', fontsize=15,
-    #              arrowprops=dict(arrowstyle="->", connectionstyle="arc3,rad=.2"))
-    #
-    # plt.annotate('\\textbf{1 high-fidelity measurement in $D_3$}', xy=(81*4, 0.1), xycoords='data',
-    #              xytext=(-90, +30), textcoords='offset points', fontsize=15,
-    #              arrowprops=dict(arrowstyle="->", connectionstyle="arc3,rad=.2"))
-
-    # plt.legend()
-    plt.xlim(1, total_x)
-    plt.ylim(0.01, 0.26)
-    plt.subplots_adjust(top=0.98, right=0.99, left=0.095, bottom=0.23)
+    # plt.xlim(1, total_x)
+    # plt.ylim(0.01, 0.26)
     #plt.savefig('hb_es.pdf', dpi=300)
     plt.savefig('sha_iteration.pdf')
     plt.show()

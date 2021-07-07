@@ -53,5 +53,7 @@ for dataset in test_datasets:
         s = np.std(perfs).item()
         if dataset == 'kuaishou1':
             print(dataset, mth, perfs, u'%.5f\u00B1%.5f' % (m, s))
+        elif dataset in ['cifar10-valid', 'cifar100', 'ImageNet16-120', 'penn']:
+            print(dataset, mth, perfs, u'%.2f\u00B1%.2f' % (m, s))
         else:
             print(dataset, mth, perfs, u'%.4f\u00B1%.4f' % (m, s))
