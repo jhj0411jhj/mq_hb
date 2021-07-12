@@ -13,29 +13,29 @@ from mq_hb.async_mq_ea import async_mqEA
 from mq_hb.async_mq_sh import async_mqSuccessiveHalving
 from mq_hb.async_mq_sh_v0 import async_mqSuccessiveHalving_v0
 from mq_hb.async_mq_sh_v2 import async_mqSuccessiveHalving_v2
+from mq_hb.async_mq_sh_v3 import async_mqSuccessiveHalving_v3
 from mq_hb.async_mq_hb import async_mqHyperband
 from mq_hb.async_mq_hb_v0 import async_mqHyperband_v0
 from mq_hb.async_mq_hb_v2 import async_mqHyperband_v2
+from mq_hb.async_mq_hb_v3 import async_mqHyperband_v3
 from mq_hb.async_mq_bohb import async_mqBOHB
 from mq_hb.async_mq_bohb_v0 import async_mqBOHB_v0
 from mq_hb.async_mq_bohb_v2 import async_mqBOHB_v2
 from mq_hb.async_mq_bohb_v3 import async_mqBOHB_v3
 from mq_hb.async_mq_bosh import async_mqBOSH
 from mq_hb.async_mq_mfes import async_mqMFES
-from mq_hb.async_mq_mfes_v3 import async_mqMFES_v3
 from mq_hb.async_mq_mfes_v6 import async_mqMFES_v6
 from mq_hb.async_mq_mfes_v12 import async_mqMFES_v12
 from mq_hb.async_mq_mfes_v13 import async_mqMFES_v13
 from mq_hb.async_mq_mfes_v14 import async_mqMFES_v14
 from mq_hb.async_mq_mfes_v15 import async_mqMFES_v15
 from mq_hb.async_mq_mfes_v16 import async_mqMFES_v16
+from mq_hb.async_mq_mfes_s import async_mqMFES_s
 
 from mq_hb.mq_mfes_v5 import mqMFES_v5
 from mq_hb.mq_mfes_v6 import mqMFES_v6
 from mq_hb.mq_mfes_v7 import mqMFES_v7
 from mq_hb.mq_mfes_v8 import mqMFES_v8
-from mq_hb.async_mq_mfes_v32 import async_mqMFES_v32
-from mq_hb.async_mq_mfes_v35 import async_mqMFES_v35
 from mq_hb.async_mq_mfes_v24 import async_mqMFES_v24
 
 mth_dict = dict(
@@ -52,24 +52,36 @@ mth_dict = dict(
     abo=(async_mqBO, 'async'),
     aea=(async_mqEA, 'async'),  # Asynchronous Evolutionary Algorithm
     aeav2=(async_mqEA, 'async', dict(strategy='oldest')),  # Asynchronous Evolutionary Algorithm
-    asha=(async_mqSuccessiveHalving, 'async'),
+    asha=(async_mqSuccessiveHalving, 'async'),       # delayed asha
     ashav0=(async_mqSuccessiveHalving_v0, 'async'),  # origin asha
     ashav2=(async_mqSuccessiveHalving_v2, 'async'),  # promotion cycle
-    ahb=(async_mqHyperband, 'async'),
-    ahbv0=(async_mqHyperband_v0, 'async'),  # origin asha
-    ahbv2=(async_mqHyperband_v2, 'async'),  # promotion cycle
+    ahb=(async_mqHyperband, 'async'),       # hb + delayed asha
+    ahbv0=(async_mqHyperband_v0, 'async'),  # hb + origin asha
+    ahbv2=(async_mqHyperband_v2, 'async'),  # hb + promotion cycle
     abohb=(async_mqBOHB, 'async'),  # prf
     abohbv0=(async_mqBOHB_v0, 'async'),  # origin asha, prf
     abohbv2=(async_mqBOHB_v2, 'async'),  # tpe
     abohbv3=(async_mqBOHB_v3, 'async'),  # amazon multi-fidelity gp
     abosh=(async_mqBOSH, 'async'),
-    amfesv3=(async_mqMFES_v3, 'async'),
     amfesv6=(async_mqMFES_v6, 'async'),
     amfesv12=(async_mqMFES_v12, 'async'),
     amfesv13=(async_mqMFES_v13, 'async'),
     amfesv14=(async_mqMFES_v14, 'async'),
     amfesv15=(async_mqMFES_v15, 'async'),
     amfesv16=(async_mqMFES_v16, 'async'),
+
+    # stopping variant
+    ashav3=(async_mqSuccessiveHalving_v3, 'async'),  # stopping variant asha
+    ahbv3=(async_mqHyperband_v3, 'async'),  # hb + stopping variant asha
+    amfess1=(async_mqMFES_s, 'async', dict(use_weight_init=True,    # from v20
+                                           weight_init_choosing='proportional',
+                                           weight_method='rank_loss_p_norm',
+                                           non_decreasing_weight=False,
+                                           increasing_weight=True, )),
+    amfess2=(async_mqMFES_s, 'async', dict(use_weight_init=False,   # from v19
+                                           weight_method='rank_loss_p_norm',
+                                           non_decreasing_weight=False,
+                                           increasing_weight=True, )),
 
     # exp version:
     mfesv5=(mqMFES_v5, 'sync'),

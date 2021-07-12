@@ -2,16 +2,17 @@ import time
 import numpy as np
 from math import log, ceil
 from mq_hb.async_mq_base_facade import async_mqBaseFacade
-from mq_hb.utils import RUNNING, COMPLETED, PROMOTED
+from mq_hb.utils import RUNNING, COMPLETED, STOPPED, PROMOTED
 from mq_hb.utils import sample_configuration
 
 from openbox.utils.config_space import ConfigurationSpace
 from openbox.utils.constants import MAXINT
 
 
-class async_mqSuccessiveHalving(async_mqBaseFacade):
+class async_mqSuccessiveHalving_v3(async_mqBaseFacade):
     """
     The implementation of Asynchronous Successive Halving Algorithm (ASHA)
+    stopping variant
     """
     def __init__(self, objective_func,
                  config_space: ConfigurationSpace,
@@ -45,6 +46,9 @@ class async_mqSuccessiveHalving(async_mqBaseFacade):
         self.bracket = None
         self.create_bracket()
 
+        # stopping variant
+        self.suspended_jobs = list()    # (rung_id, job)
+
     def create_bracket(self):
         """
         bracket : list of rungs
@@ -75,56 +79,58 @@ class async_mqSuccessiveHalving(async_mqBaseFacade):
 
     def get_job(self):
         """
-        find promotable config, or sample a new config
+        decide suspended job to be continued or stopped, or sample a new config
         """
         next_config = None
         next_n_iteration = None
         next_extra_conf = None
-        # find promotable config from top to bottom
-        for rung_id in reversed(range(len(self.bracket) - 1)):
-            # if not enough jobs, do not promote
-            if not self.can_promote(rung_id):
-                continue
 
-            # job: [job_status, config, perf, extra_conf]
-            self.bracket[rung_id]['jobs'] = sorted(self.bracket[rung_id]['jobs'], key=lambda x: x[2])
-            complete_jobs = [(job_id, job) for job_id, job in enumerate(self.bracket[rung_id]['jobs'])
-                             if job[0] in (COMPLETED, PROMOTED)]
+        # decide suspended job
+        len_suspended_jobs = len(self.suspended_jobs)
+        if len_suspended_jobs > 0:
+            if len_suspended_jobs > 1:
+                self.logger.info('len(suspended_jobs) = %d > 1. Please check.' % (len_suspended_jobs, ))
+            rung_id, job = self.suspended_jobs.pop(0)
+            job_status, config, perf, extra_conf = job
+            assert job_status == COMPLETED and rung_id < len(self.bracket) - 1
 
-            # keep the first 1/eta
-            candidate_jobs = complete_jobs[0: int(len(complete_jobs) / self.eta)]
-            for job_id, job in candidate_jobs:
-                job_status, config, perf, extra_conf = job
-                if not (job_status == COMPLETED and perf < MAXINT):
-                    continue
-                # check if config already exists in upper rungs
-                exist = False
-                for i in range(rung_id + 1, len(self.bracket)):
-                    if config in self.bracket[i]['configs']:
-                        exist = True
-                        break
-                # promote
-                if not exist:
+            # check if config already exists in upper rungs
+            exist = False
+            for i in range(rung_id + 1, len(self.bracket)):
+                if config in self.bracket[i]['configs']:
+                    exist = True
+                    break
+            if not exist:
+                # job: [job_status, config, perf, extra_conf]
+                self.bracket[rung_id]['jobs'] = sorted(self.bracket[rung_id]['jobs'], key=lambda x: x[2])
+                complete_jobs = [_job for _job in self.bracket[rung_id]['jobs']
+                                 if _job[0] in (COMPLETED, PROMOTED, STOPPED)]
+                idx = complete_jobs.index(job)
+                # promote (Caution ceil: first job should be promoted)
+                if perf < MAXINT and idx < ceil(len(complete_jobs) / self.eta):
                     next_config = config
                     next_n_iteration = self.bracket[rung_id + 1]['n_iteration']
                     next_extra_conf = extra_conf.copy()
                     next_extra_conf['initial_run'] = False  # for loading from checkpoint in DL
                     # update bracket
-                    self.logger.info('Promote job in rung %d: %s' % (rung_id, self.bracket[rung_id]['jobs'][job_id]))
-                    self.bracket[rung_id]['jobs'][job_id][0] = PROMOTED
+                    self.logger.info('Promote job in rung %d: %s' % (rung_id, job))
+                    job[0] = PROMOTED
                     self.bracket[rung_id]['num_promoted'] += 1
-                    new_job = [RUNNING, next_config, MAXINT, next_extra_conf]     # running perf is set to MAXINT
+                    new_job = [RUNNING, next_config, MAXINT, next_extra_conf]  # running perf is set to MAXINT
                     self.bracket[rung_id + 1]['jobs'].append(new_job)
                     self.bracket[rung_id + 1]['configs'].add(next_config)
                     assert len(self.bracket[rung_id + 1]['jobs']) == len(self.bracket[rung_id + 1]['configs'])
-                    break
-            if next_config is not None:
-                break
+
+            # stop job
+            assert job[0] in [COMPLETED, PROMOTED, STOPPED]  # [COMPLETED, PROMOTED]
+            if job[0] == COMPLETED:
+                self.logger.info('Stop job in rung %d: %s' % (rung_id, job))
+                job[0] = STOPPED
 
         # no promotable config, sample a new one
         if next_config is None:
             next_config, next_n_iteration, next_extra_conf = self.choose_next()
-            next_extra_conf['initial_run'] = True   # for loading from checkpoint in DL
+            next_extra_conf['initial_run'] = True  # for loading from checkpoint in DL
             # update bracket
             rung_id = self.get_rung_id(self.bracket, next_n_iteration)
             self.logger.info('Sample a new config: %s. Add to rung %d.' % (next_config, rung_id))
@@ -135,19 +141,6 @@ class async_mqSuccessiveHalving(async_mqBaseFacade):
 
         # print('=== bracket after get_job:', self.get_bracket_status(self.bracket))
         return next_config, next_n_iteration, next_extra_conf
-
-    def can_promote(self, rung_id):
-        """
-        return whether configs can be promoted in current rung
-        """
-        # if not enough jobs, do not promote
-        num_completed_promoted = len([job for job in self.bracket[rung_id]['jobs']
-                                      if job[0] in (COMPLETED, PROMOTED)])
-        num_promoted = self.bracket[rung_id]['num_promoted']
-        if num_completed_promoted == 0 or (num_promoted + 1) / num_completed_promoted > 1 / self.eta:
-            return False
-
-        return True
 
     def update_observation(self, config, perf, n_iteration):
         rung_id = self.get_rung_id(self.bracket, n_iteration)
@@ -160,6 +153,10 @@ class async_mqSuccessiveHalving(async_mqBaseFacade):
                 job[0] = COMPLETED
                 job[2] = perf
                 updated = True
+                if rung_id < len(self.bracket) - 1:  # not top rung
+                    self.suspended_jobs.append((rung_id, job))
+                else:
+                    job[0] = STOPPED
                 break
         assert updated
         # print('=== bracket after update_observation:', self.get_bracket_status(self.bracket))
@@ -190,22 +187,25 @@ class async_mqSuccessiveHalving(async_mqBaseFacade):
 
     @staticmethod
     def get_bracket_status(bracket):
-        status = '\n' + '=' * 46 + '\n'
-        status += 'rung_id n_iteration PROMOTED COMPLETED RUNNING\n'
+        status = '\n' + '=' * 54 + '\n'
+        status += 'rung_id n_iteration PROMOTED STOPPED COMPLETED RUNNING\n'
         for rung in bracket:
             rung_id = rung['rung_id']
             n_iteration = rung['n_iteration']
             jobs = rung['jobs']
-            num_running, num_completed, num_promoted = 0, 0, 0
+            num_running, num_stopped, num_completed, num_promoted = 0, 0, 0, 0
             for _job_status, _config, _perf, _extra_conf in jobs:
                 if _job_status == RUNNING:
                     num_running += 1
+                elif _job_status == STOPPED:
+                    num_stopped += 1
                 elif _job_status == COMPLETED:
                     num_completed += 1
                 elif _job_status == PROMOTED:
                     num_promoted += 1
-            status += '%7d %11d %8d %9d %7d\n' % (rung_id, n_iteration, num_promoted, num_completed, num_running)
-        status += '=' * 46 + '\n'
+            status += '%7d %11d %8d %7d %9d %7d\n' % (rung_id, n_iteration,
+                                                      num_promoted, num_stopped, num_completed, num_running)
+        status += '=' * 54 + '\n'
         return status
 
     def get_incumbent(self, num_inc=1):

@@ -5,40 +5,29 @@ from math import log, ceil
 from sklearn.model_selection import KFold
 from scipy.optimize import minimize
 
-from mq_hb.async_mq_hb import async_mqHyperband
-from mq_hb.utils import RUNNING, COMPLETED, PROMOTED
+from mq_hb.async_mq_hb_v3 import async_mqHyperband_v3
+from mq_hb.utils import RUNNING, COMPLETED, STOPPED, PROMOTED
 from mq_hb.utils import sample_configuration
 from mq_hb.utils import minmax_normalization, std_normalization
 from mq_hb.surrogate.rf_ensemble import RandomForestEnsemble
+from mq_hb.surrogate.gp_ensemble import GaussianProcessEnsemble
 from mq_hb.acq_maximizer.ei_optimization import RandomSampling
 
 from openbox.utils.util_funcs import get_types
 from openbox.utils.config_space import ConfigurationSpace
 from openbox.acquisition_function.acquisition import EI
 from openbox.surrogate.base.rf_with_instances import RandomForestWithInstances
+from openbox.surrogate.base.build_gp import create_gp_model
 from openbox.acq_maximizer.ei_optimization import InterleavedLocalAndRandomSearch, RandomSearch
 from openbox.acq_maximizer.random_configuration_chooser import ChooserProb
 from openbox.utils.config_space.util import convert_configurations_to_array
 from openbox.utils.history_container import HistoryContainer
 
 
-class async_mqMFES_v35(async_mqHyperband):
+class async_mqMFES_s(async_mqHyperband_v3):
     """
     The implementation of Asynchronous MFES (combine ASHA and MFES)
-    before fix
-    no median
-    promotion start threshold: v3
-    v6: non_decreasing_weight
-    === from v6
-    v13: choose n_iteration of new config by unadjusted weight (random choice)
-         update_weight when update_observation
-
-    === from v32 weight_method='rank_loss_prob' optimizer=localrandom
-    === exp version : test weight init
-    use_weight_init=True
-    update_weight when update_observation
-    non_decreasing_weight=False, increasing_weight=True
-    v35: softmax probability (top 2)
+    stopping variant
     """
 
     def __init__(self, objective_func,
@@ -47,13 +36,22 @@ class async_mqMFES_v35(async_mqHyperband):
                  eta=3,
                  skip_outer_loop=0,
                  rand_prob=0.3,
-                 use_weight_init=True,
                  init_weight=None, update_enable=True,
-                 weight_method='rank_loss_prob',
+                 weight_method='rank_loss_p_norm',
                  fusion_method='idp',
                  power_num=3,
+                 set_promotion_threshold=True,
                  non_decreasing_weight=False,
                  increasing_weight=True,
+                 surrogate_type='prf',  # 'prf', 'gp'
+                 acq_optimizer='local_random',  # 'local_random', 'random'
+                 use_weight_init=True,
+                 weight_init_choosing='proportional',  # 'proportional', 'pow', 'argmax', 'argmax2'
+                 median_imputation=None,  # None, 'top', 'corresponding', 'all'
+                 test_sh=False,
+                 test_random=False,
+                 test_bohb=False,
+                 test_original_asha=False,
                  random_state=1,
                  method_id='mqAsyncMFES',
                  restart_needed=True,
@@ -62,10 +60,19 @@ class async_mqMFES_v35(async_mqHyperband):
                  ip='',
                  port=13579,
                  authkey=b'abc'):
+
+        self.set_promotion_threshold = set_promotion_threshold
+
         super().__init__(objective_func, config_space, R, eta=eta, skip_outer_loop=skip_outer_loop,
                          random_state=random_state, method_id=method_id, restart_needed=restart_needed,
                          time_limit_per_trial=time_limit_per_trial, runtime_limit=runtime_limit,
                          ip=ip, port=port, authkey=authkey)
+
+        # test version
+        self.test_sh = test_sh
+        self.test_random = test_random
+        self.test_bohb = test_bohb
+        self.test_original_asha = test_original_asha
 
         self.update_enable = update_enable
         self.fusion_method = fusion_method
@@ -76,14 +83,29 @@ class async_mqMFES_v35(async_mqHyperband):
         self.weight_update_id = 0
         self.weight_changed_cnt = 0
 
-        if init_weight is None:
-            init_weight = [1. / self.s_max] * self.s_max + [0.]
-        assert len(init_weight) == (self.s_max + 1)
-        self.logger.info("Initialize weight to %s" % init_weight[:self.s_max + 1])
+        self.init_weight = init_weight
+        if self.init_weight is None:
+            if self.test_bohb:
+                self.init_weight = [0.] * self.s_max + [1.]
+            elif self.s_max == 0:
+                self.init_weight = [1.]
+            else:
+                self.init_weight = [1. / self.s_max] * self.s_max + [0.]
+        assert len(self.init_weight) == (self.s_max + 1)
+        self.logger.info("Initialize weight to %s" % self.init_weight)
         types, bounds = get_types(config_space)
 
-        self.surrogate = RandomForestEnsemble(types, bounds, self.s_max, self.eta,
-                                              init_weight, self.fusion_method)
+        self.rng = np.random.RandomState(seed=self.seed)
+
+        self.surrogate_type = surrogate_type
+        if self.surrogate_type == 'prf':
+            self.surrogate = RandomForestEnsemble(types, bounds, self.s_max, self.eta,
+                                                  self.init_weight, self.fusion_method)
+        elif self.surrogate_type == 'gp':
+            self.surrogate = GaussianProcessEnsemble(config_space, types, bounds, self.s_max, self.eta,
+                                                     self.init_weight, self.fusion_method, self.rng)
+        else:
+            raise ValueError('Unknown surrogate type: %s' % self.surrogate_type)
         self.acquisition_function = EI(model=self.surrogate)
 
         self.iterate_id = 0
@@ -105,16 +127,22 @@ class async_mqMFES_v35(async_mqHyperband):
         self.sls_max_steps = None
         self.n_sls_iterations = 5
         self.sls_n_steps_plateau_walk = 10
-        self.rng = np.random.RandomState(seed=self.seed)
-        self.acq_optimizer = InterleavedLocalAndRandomSearch(
-            acquisition_function=self.acquisition_function,
-            config_space=self.config_space,
-            rng=self.rng,
-            max_steps=self.sls_max_steps,
-            n_steps_plateau_walk=self.sls_n_steps_plateau_walk,
-            n_sls_iterations=self.n_sls_iterations,
-            rand_prob=0.0,
-        )
+        self.acq_optimizer_type = acq_optimizer
+        if self.acq_optimizer_type == 'local_random':
+            self.acq_optimizer = InterleavedLocalAndRandomSearch(
+                acquisition_function=self.acquisition_function,
+                config_space=self.config_space,
+                rng=self.rng,
+                max_steps=self.sls_max_steps,
+                n_steps_plateau_walk=self.sls_n_steps_plateau_walk,
+                n_sls_iterations=self.n_sls_iterations,
+                rand_prob=0.0,
+            )
+        elif self.acq_optimizer_type == 'random':
+            self.acq_optimizer = RandomSampling(self.acquisition_function, config_space,
+                                                n_samples=max(5000, 50 * len(bounds)))
+        else:
+            raise ValueError
         self.random_configuration_chooser = ChooserProb(prob=rand_prob, rng=self.rng)
         self.random_check_idx = 0
 
@@ -122,10 +150,18 @@ class async_mqMFES_v35(async_mqHyperband):
         self.increasing_weight = increasing_weight
         assert not (self.non_decreasing_weight and self.increasing_weight)
         self.use_weight_init = use_weight_init
+        self.weight_init_choosing = weight_init_choosing
+        assert self.weight_init_choosing in ['proportional', 'pow', 'argmax', 'argmax2']
         self.n_init_configs = np.array(
             [len(init_iter_list) for init_iter_list in self.hb_bracket_list],
             dtype=np.float64
         )
+
+        # median imputation
+        self.median_imputation = median_imputation
+        self.configs_running_dict = dict()
+        self.all_configs_running = set()
+        assert self.median_imputation in [None, 'top', 'corresponding', 'all']
 
     def create_bracket(self):
         """
@@ -154,28 +190,51 @@ class async_mqMFES_v35(async_mqHyperband):
                 jobs=list(),
                 configs=set(),
                 num_promoted=0,
-                promotion_start_threshold=promotion_start_threshold,    # set promotion start threshold
+                # set promotion start threshold
+                promotion_start_threshold=promotion_start_threshold if self.set_promotion_threshold else 0,
             )
             self.bracket.append(rung)
         self.logger.info('Init bracket: %s.' % str(self.bracket))
 
-    def can_promote(self, rung_id):
-        """
-        return whether configs can be promoted in current rung
-        """
-        # if not enough jobs, do not promote
-        num_completed_promoted = len([job for job in self.bracket[rung_id]['jobs']
-                                      if job[0] in (COMPLETED, PROMOTED)])
-        num_promoted = self.bracket[rung_id]['num_promoted']
-        if num_completed_promoted == 0 or (num_promoted + 1) / num_completed_promoted > 1 / self.eta:
-            return False
+    def get_job(self):
+        next_config, next_n_iteration, next_extra_conf = super().get_job()
+        # for median imputation
+        if self.median_imputation is not None:
+            start_time = time.time()
+            r = int(next_n_iteration)
+            if r not in self.configs_running_dict.keys():
+                self.configs_running_dict[r] = set()
+            self.configs_running_dict[r].add(next_config)
+            self.all_configs_running.add(next_config)
 
-        # prevent error promotion in start stage
-        promotion_start_threshold = self.bracket[rung_id]['promotion_start_threshold']
-        if num_completed_promoted < promotion_start_threshold:
-            return False
+            if self.median_imputation == 'corresponding':
+                self.train_surrogate(self.surrogate, r, median_imputation=True)
+            elif self.median_imputation == 'top':
+                # self.train_surrogate(self.surrogate, self.iterate_r[-1], median_imputation=True, all_impute=True)
+                pass    # refit when update_observation
+            elif self.median_imputation == 'all':
+                pass    # refit when update_observation
+            else:
+                raise ValueError('Unknown median_imputation: %s' % self.median_imputation)
 
-        return True
+            self.logger.info('get_job median_imputation cost %.2fs.' % (time.time() - start_time))
+
+        return next_config, next_n_iteration, next_extra_conf
+
+    def train_surrogate(self, surrogate, n_iteration: int, median_imputation: bool, all_impute=False):
+        if median_imputation:
+            if all_impute:
+                configs_running = list(self.all_configs_running)
+            else:
+                configs_running = list(self.configs_running_dict[n_iteration])
+            value_imputed = np.median(self.target_y[n_iteration])
+            configs_train = self.target_x[n_iteration] + configs_running
+            results_train = self.target_y[n_iteration] + [value_imputed] * len(configs_running)
+        else:
+            configs_train = self.target_x[n_iteration]
+            results_train = self.target_y[n_iteration]
+        results_train = np.array(std_normalization(results_train), dtype=np.float64)
+        surrogate.train(convert_configurations_to_array(configs_train), results_train, r=n_iteration)
 
     def update_observation(self, config, perf, n_iteration):
         rung_id = self.get_rung_id(self.bracket, n_iteration)
@@ -188,20 +247,39 @@ class async_mqMFES_v35(async_mqHyperband):
                 job[0] = COMPLETED
                 job[2] = perf
                 updated = True
+                if rung_id < len(self.bracket) - 1:  # not top rung
+                    self.suspended_jobs.append((rung_id, job))
+                else:
+                    job[0] = STOPPED
                 break
         assert updated
         # print('=== bracket after update_observation:', self.get_bracket_status(self.bracket))
 
         n_iteration = int(n_iteration)
 
-        configs_running = list()
-        for _config in self.bracket[rung_id]['configs']:
-            if _config not in self.target_x[n_iteration]:
-                configs_running.append(_config)
-        value_imputed = np.median(self.target_y[n_iteration])
-
         self.target_x[n_iteration].append(config)
         self.target_y[n_iteration].append(perf)
+
+        if self.median_imputation is not None:
+            self.configs_running_dict[n_iteration].remove(config)
+            self.all_configs_running.remove(config)
+
+        # Refit the ensemble surrogate model.
+        start_time = time.time()
+        if self.median_imputation is None:
+            self.train_surrogate(self.surrogate, n_iteration, median_imputation=False)
+        elif self.median_imputation == 'corresponding':
+            self.train_surrogate(self.surrogate, n_iteration, median_imputation=True)
+        elif self.median_imputation == 'top':
+            if n_iteration != self.iterate_r[-1]:
+                self.train_surrogate(self.surrogate, n_iteration, median_imputation=False)
+            self.train_surrogate(self.surrogate, self.iterate_r[-1], median_imputation=True, all_impute=True)
+        elif self.median_imputation == 'all':
+            for r in self.iterate_r:
+                self.train_surrogate(self.surrogate, r, median_imputation=True, all_impute=True)
+        else:
+            raise ValueError('Unknown median_imputation: %s' % self.median_imputation)
+        self.logger.info('update_observation training surrogate cost %.2fs.' % (time.time() - start_time))
 
         if n_iteration == self.R:
             self.incumbent_configs.append(config)
@@ -214,12 +292,6 @@ class async_mqMFES_v35(async_mqHyperband):
                 self.weight_update_id += 1
                 self.update_weight()
 
-        # Refit the ensemble surrogate model. todo: no median
-        configs_train = self.target_x[n_iteration]
-        results_train = self.target_y[n_iteration]
-        results_train = np.array(std_normalization(results_train), dtype=np.float64)
-        self.surrogate.train(convert_configurations_to_array(configs_train), results_train, r=n_iteration)
-
     def choose_next(self):
         """
         sample a config according to MFES. give iterations according to Hyperband strategy.
@@ -230,7 +302,7 @@ class async_mqMFES_v35(async_mqHyperband):
 
         # sample config
         excluded_configs = self.bracket[next_rung_id]['configs']
-        if len(self.target_y[self.iterate_r[-1]]) == 0:
+        if len(self.target_y[self.iterate_r[-1]]) == 0 or self.test_random:
             next_config = sample_configuration(self.config_space, excluded_configs=excluded_configs)
         else:
             # Like BOHB, sample a fixed percentage of random configurations.
@@ -255,40 +327,86 @@ class async_mqMFES_v35(async_mqHyperband):
         """
         choose next_n_iteration according to weights
         """
+        if self.test_sh:
+            return self.bracket[0]['n_iteration']
+
         if self.use_weight_init and len(self.incumbent_configs) >= 3 * 8:  # todo: replace 8 by full observation num
-            power_num = 3
-            top_k = 2
-            new_weights = self.hist_weights_unadjusted[-1]
-            choose_weights = np.array(new_weights, dtype=np.float64) ** power_num
-            choose_weights[-1] = 0.
-            top_idx = np.argsort(choose_weights)[::-1][:top_k]
-            # retain top k weights
-            for i in range(len(choose_weights)):
-                if i not in top_idx:
-                    choose_weights[i] = 0.
-            weight_sum = np.sum(choose_weights)
-            if weight_sum <= 1e-8:
-                choose_weights = np.array([1. / self.s_max] * self.s_max + [0.], dtype=np.float64)
+            if self.weight_init_choosing == 'proportional':
+                top_k = 2
+                new_weights = self.hist_weights_unadjusted[-1]
+                choose_weights = np.asarray(new_weights, dtype=np.float64) * self.n_init_configs
+                top_idx = np.argsort(choose_weights)[::-1][:top_k]
+                # retain top k weights
+                for i in range(len(choose_weights)):
+                    if i not in top_idx:
+                        choose_weights[i] = 0.
+                choose_weights = choose_weights / np.sum(choose_weights)
+                next_n_iteration = self.rng.choice(self.iterate_r, p=choose_weights)
+                self.logger.info('random choosing next_n_iteration=%d. unadjusted_weights: %s. '
+                                 'n_init_configs: %s. choose_weights: %s.'
+                                 % (next_n_iteration, new_weights, self.n_init_configs, choose_weights))
+            elif self.weight_init_choosing == 'pow':
+                top_k = 2
+                new_weights = self.hist_weights_unadjusted[-1]
+                choose_weights = np.array(new_weights, dtype=np.float64) ** self.power_num
+                choose_weights[-1] = 0.
+                top_idx = np.argsort(choose_weights)[::-1][:top_k]
+                # retain top k weights
+                for i in range(len(choose_weights)):
+                    if i not in top_idx:
+                        choose_weights[i] = 0.
+                weight_sum = np.sum(choose_weights)
+                if weight_sum <= 1e-8:
+                    choose_weights = np.array(self.init_weight, dtype=np.float64)
+                else:
+                    choose_weights = choose_weights / weight_sum
+                next_n_iteration = self.rng.choice(self.iterate_r, p=choose_weights)
+                self.logger.info('random choosing next_n_iteration=%d. new_weights: %s. choose_weights: %s.'
+                                 % (next_n_iteration, new_weights, choose_weights))
+            elif self.weight_init_choosing == 'argmax':
+                new_weights = self.hist_weights_unadjusted[-1]
+                choose_weights = np.asarray(new_weights, dtype=np.float64) * self.n_init_configs
+                choose_weights = choose_weights / np.sum(choose_weights)
+                idx = np.argmax(choose_weights).item()
+                next_n_iteration = self.iterate_r[idx]
+                self.logger.info('argmax choosing next_n_iteration=%d. new_weights: %s. '
+                                 'n_init_configs: %s. choose_weights: %s.'
+                                 % (next_n_iteration, new_weights, self.n_init_configs, choose_weights))
+            elif self.weight_init_choosing == 'argmax2':
+                new_weights = self.hist_weights_unadjusted[-1]
+                idx = np.argmax(new_weights).item()
+                next_n_iteration = self.iterate_r[idx]
+                self.logger.info('argmax2 choosing next_n_iteration=%d. new_weights: %s.'
+                                 % (next_n_iteration, new_weights))
             else:
-                choose_weights = choose_weights / weight_sum
-            next_n_iteration = self.rng.choice(self.iterate_r, p=choose_weights)
-            self.logger.info('random choosing next_n_iteration=%d. new_weights: %s. choose_weights: %s.'
-                             % (next_n_iteration, new_weights, choose_weights))
+                raise ValueError('Unknown weight_init_choosing: %s' % self.weight_init_choosing)
             return next_n_iteration
 
         return super().get_next_n_iteration()
 
     def get_bo_candidates(self):
-        std_incumbent_value = np.min(std_normalization(self.target_y[self.iterate_r[-1]]))
-        # Update surrogate model in acquisition function.
-        self.acquisition_function.update(model=self.surrogate, eta=std_incumbent_value,
-                                         num_data=len(self.incumbent_configs))
+        if self.acq_optimizer_type == 'local_random':
+            std_incumbent_value = np.min(std_normalization(self.target_y[self.iterate_r[-1]]))
+            # Update surrogate model in acquisition function.
+            self.acquisition_function.update(model=self.surrogate, eta=std_incumbent_value,
+                                             num_data=len(self.incumbent_configs))
 
-        challengers = self.acq_optimizer.maximize(
-            runhistory=self.history_container,
-            num_points=5000,
-        )
-        return challengers.challengers
+            challengers = self.acq_optimizer.maximize(
+                runhistory=self.history_container,
+                num_points=5000,
+            )
+            return challengers.challengers
+        elif self.acq_optimizer_type == 'random':
+            best_index = np.argmin(self.incumbent_perfs)
+            best_config = self.incumbent_configs[best_index]
+            std_incumbent_value = np.min(std_normalization(self.incumbent_perfs))
+            # Update surrogate model in acquisition function.
+            self.acquisition_function.update(model=self.surrogate, eta=std_incumbent_value,
+                                             num_data=len(self.incumbent_configs))
+            candidates = self.acq_optimizer.maximize(best_config=best_config, batch_size=5000)
+            return candidates
+        else:
+            raise ValueError
 
     @staticmethod
     def calculate_preserving_order_num(y_pred, y_true):
@@ -322,6 +440,22 @@ class async_mqMFES_v35(async_mqHyperband):
             old_weights.append(_weight)
 
         if len(test_y) >= 3:
+            # refit surrogate model without median imputation
+            if self.median_imputation is None:
+                test_surrogate = self.surrogate
+            else:
+                types, bounds = get_types(self.config_space)
+                if self.surrogate_type == 'prf':
+                    test_surrogate = RandomForestEnsemble(types, bounds, self.s_max, self.eta,
+                                                          old_weights, self.fusion_method)
+                elif self.surrogate_type == 'gp':
+                    test_surrogate = GaussianProcessEnsemble(self.config_space, types, bounds, self.s_max, self.eta,
+                                                             old_weights, self.fusion_method, self.rng)
+                else:
+                    raise ValueError('Unknown surrogate type: %s' % self.surrogate_type)
+                for r in self.iterate_r:
+                    self.train_surrogate(test_surrogate, r, median_imputation=False)
+
             # Get previous weights
             if self.weight_method == 'rank_loss_p_norm':
                 preserving_order_p = list()
@@ -329,7 +463,7 @@ class async_mqMFES_v35(async_mqHyperband):
                 for i, r in enumerate(r_list):
                     fold_num = 5
                     if i != K - 1:
-                        mean, var = self.surrogate.surrogate_container[r].predict(test_x)   # todo check median imp!!!
+                        mean, var = test_surrogate.surrogate_container[r].predict(test_x)
                         tmp_y = np.reshape(mean, -1)
                         preorder_num, pair_num = self.calculate_preserving_order_num(tmp_y, test_y)
                         preserving_order_p.append(preorder_num / pair_num)
@@ -345,7 +479,12 @@ class async_mqMFES_v35(async_mqHyperband):
                                 train_configs, train_y = test_x[train_idx], test_y[train_idx]
                                 valid_configs, valid_y = test_x[valid_idx], test_y[valid_idx]
                                 types, bounds = get_types(self.config_space)
-                                _surrogate = RandomForestWithInstances(types=types, bounds=bounds)
+                                if self.surrogate_type == 'prf':
+                                    _surrogate = RandomForestWithInstances(types=types, bounds=bounds)
+                                elif self.surrogate_type == 'gp':
+                                    _surrogate = create_gp_model('gp', self.config_space, types, bounds, self.rng)
+                                else:
+                                    raise ValueError('Unknown surrogate type: %s' % self.surrogate_type)
                                 _surrogate.train(train_configs, train_y)
                                 pred, _ = _surrogate.predict(valid_configs)
                                 cv_pred[valid_idx] = pred.reshape(-1)
@@ -353,6 +492,7 @@ class async_mqMFES_v35(async_mqHyperband):
                             preserving_order_p.append(preorder_num / pair_num)
                             preserving_order_nums.append(preorder_num)
 
+                self.logger.info('update weight preserving_order_p: %s' % preserving_order_p)
                 trans_order_weight = np.array(preserving_order_p)
                 power_sum = np.sum(np.power(trans_order_weight, self.power_num))
                 new_weights = np.power(trans_order_weight, self.power_num) / power_sum
@@ -363,7 +503,7 @@ class async_mqMFES_v35(async_mqHyperband):
                 mean_list, var_list = list(), list()
                 prob_list = list()
                 for i, r in enumerate(r_list[:-1]):
-                    mean, var = self.surrogate.surrogate_container[r].predict(test_x)
+                    mean, var = test_surrogate.surrogate_container[r].predict(test_x)
                     mean_list.append(np.reshape(mean, -1))
                     var_list.append(np.reshape(var, -1))
 
@@ -373,6 +513,7 @@ class async_mqMFES_v35(async_mqHyperband):
                 self.logger.info('update weight preserving_order prob_list: %s' % prob_list)
 
                 t2 = time.time()
+
                 sample_num = 100
                 min_probability_array = [0] * K
                 for _ in range(sample_num):
@@ -386,25 +527,28 @@ class async_mqMFES_v35(async_mqHyperband):
 
                     fold_num = 5
                     # For basic surrogate i=K. cv
-                    if len(test_y) < 2 * fold_num:
+                    if len(test_y) < 2 * fold_num or self.increasing_weight:
                         order_preseving_nums.append(0)
                     else:
                         # 5-fold cross validation.
-                        # kfold = KFold(n_splits=fold_num)
-                        # cv_pred = np.array([0] * len(test_y))
-                        # for train_idx, valid_idx in kfold.split(test_x):
-                        #     train_configs, train_y = test_x[train_idx], test_y[train_idx]
-                        #     valid_configs, valid_y = test_x[valid_idx], test_y[valid_idx]
-                        #     types, bounds = get_types(self.config_space)
-                        #     _surrogate = RandomForestWithInstances(types=types, bounds=bounds)
-                        #     _surrogate.train(train_configs, train_y)
-                        #     _pred, _var = _surrogate.predict(valid_configs)
-                        #     sampled_pred = self.rng.normal(_pred.reshape(-1), _var.reshape(-1))
-                        #     cv_pred[valid_idx] = sampled_pred
-                        # _num, _ = self.calculate_preserving_order_num(cv_pred, test_y)
-                        # order_preseving_nums.append(_num)
-                        assert self.increasing_weight is True
-                        order_preseving_nums.append(0)
+                        kfold = KFold(n_splits=fold_num)
+                        cv_pred = np.array([0] * len(test_y))
+                        for train_idx, valid_idx in kfold.split(test_x):    # todo: reduce cost!!!
+                            train_configs, train_y = test_x[train_idx], test_y[train_idx]
+                            valid_configs, valid_y = test_x[valid_idx], test_y[valid_idx]
+                            types, bounds = get_types(self.config_space)
+                            if self.surrogate_type == 'prf':
+                                _surrogate = RandomForestWithInstances(types=types, bounds=bounds)
+                            elif self.surrogate_type == 'gp':
+                                _surrogate = create_gp_model('gp', self.config_space, types, bounds, self.rng)
+                            else:
+                                raise ValueError('Unknown surrogate type: %s' % self.surrogate_type)
+                            _surrogate.train(train_configs, train_y)
+                            _pred, _var = _surrogate.predict(valid_configs)
+                            sampled_pred = self.rng.normal(_pred.reshape(-1), _var.reshape(-1))
+                            cv_pred[valid_idx] = sampled_pred
+                        _num, _ = self.calculate_preserving_order_num(cv_pred, test_y)
+                        order_preseving_nums.append(_num)
                     max_id = np.argmax(order_preseving_nums)
                     min_probability_array[max_id] += 1
                 new_weights = np.array(min_probability_array) / sample_num
@@ -456,8 +600,9 @@ class async_mqMFES_v35(async_mqHyperband):
             self.weight_method, self.weight_changed_cnt, str(new_weights)))
 
         # Assign the weight to each basic surrogate.
-        for i, r in enumerate(r_list):
-            self.surrogate.surrogate_weight[r] = new_weights[i]
+        if not self.test_bohb:
+            for i, r in enumerate(r_list):
+                self.surrogate.surrogate_weight[r] = new_weights[i]
         self.weight_changed_cnt += 1
         # Save the weight data.
         self.hist_weights.append(new_weights)

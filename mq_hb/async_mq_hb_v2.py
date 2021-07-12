@@ -130,7 +130,7 @@ class async_mqHyperband_v2(async_mqBaseFacade):
                 if job_status == WAITING:
                     next_config = config
                     next_n_iteration = rung['n_iteration']
-                    next_extra_conf = extra_conf
+                    next_extra_conf = extra_conf.copy()
                     # update bracket
                     self.logger.info('Running job in bracket %d rung %d: %s'
                                      % (rung['bracket_id'], rung['rung_id'], rung['jobs'][job_id]))
@@ -197,7 +197,7 @@ class async_mqHyperband_v2(async_mqBaseFacade):
             n_set_promote += 1
             next_config = config
             next_n_iteration = bracket[rung_id + 1]['n_iteration']
-            next_extra_conf = extra_conf
+            next_extra_conf = extra_conf.copy()
             next_extra_conf['initial_run'] = False  # for loading from checkpoint in DL
             # update bracket
             self.logger.info('Promote job in bracket %d rung %d: %s' %

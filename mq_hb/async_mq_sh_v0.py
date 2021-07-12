@@ -108,7 +108,7 @@ class async_mqSuccessiveHalving_v0(async_mqBaseFacade):
                 if not exist:
                     next_config = config
                     next_n_iteration = self.bracket[rung_id + 1]['n_iteration']
-                    next_extra_conf = extra_conf
+                    next_extra_conf = extra_conf.copy()
                     next_extra_conf['initial_run'] = False  # for loading from checkpoint in DL
                     # update bracket
                     self.logger.info('Promote job in rung %d: %s' % (rung_id, self.bracket[rung_id]['jobs'][job_id]))

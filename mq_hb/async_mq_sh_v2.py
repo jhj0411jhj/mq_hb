@@ -91,7 +91,7 @@ class async_mqSuccessiveHalving_v2(async_mqBaseFacade):
                 if job_status == WAITING:
                     next_config = config
                     next_n_iteration = self.bracket[rung_id]['n_iteration']
-                    next_extra_conf = extra_conf
+                    next_extra_conf = extra_conf.copy()
                     # update bracket
                     self.logger.info('Running job in rung %d: %s' % (rung_id, self.bracket[rung_id]['jobs'][job_id]))
                     self.bracket[rung_id]['jobs'][job_id][0] = RUNNING
@@ -156,7 +156,7 @@ class async_mqSuccessiveHalving_v2(async_mqBaseFacade):
             n_set_promote += 1
             next_config = config
             next_n_iteration = self.bracket[rung_id + 1]['n_iteration']
-            next_extra_conf = extra_conf
+            next_extra_conf = extra_conf.copy()
             next_extra_conf['initial_run'] = False  # for loading from checkpoint in DL
             # update bracket
             self.logger.info('Promote job in rung %d: %s' % (rung_id, self.bracket[rung_id]['jobs'][job_id]))
