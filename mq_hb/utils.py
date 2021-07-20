@@ -103,3 +103,14 @@ def norm2_normalization(x):
     z = np.array(x)
     normalized_z = z / np.linalg.norm(z)
     return normalized_z
+
+
+def get_host_ip():
+    import socket
+    hostname = socket.gethostname()
+    ip = socket.gethostbyname(hostname)
+    return ip
+
+
+class StoppingException(Exception):
+    pass
