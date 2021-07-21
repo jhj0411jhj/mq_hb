@@ -32,11 +32,22 @@ from mq_hb.async_mq_mfes_v15 import async_mqMFES_v15
 from mq_hb.async_mq_mfes_v16 import async_mqMFES_v16
 from mq_hb.async_mq_mfes_s import async_mqMFES_s
 
+from mq_hb.async_mq_sh_stopping import async_mqSuccessiveHalving_stopping
+from mq_hb.async_mq_hb_stopping import async_mqHyperband_stopping
+from mq_hb.async_mq_mfes_stopping import async_mqMFES_stopping
+
 from mq_hb.mq_mfes_v5 import mqMFES_v5
 from mq_hb.mq_mfes_v6 import mqMFES_v6
 from mq_hb.mq_mfes_v7 import mqMFES_v7
 from mq_hb.mq_mfes_v8 import mqMFES_v8
 from mq_hb.async_mq_mfes_v24 import async_mqMFES_v24
+
+# stopping variant (reporter)
+stopping_mths = [
+    async_mqSuccessiveHalving_stopping,
+    async_mqHyperband_stopping,
+    async_mqMFES_stopping,
+]
 
 mth_dict = dict(
     random=(mqRandomSearch, 'sync'),
@@ -82,6 +93,19 @@ mth_dict = dict(
                                            weight_method='rank_loss_p_norm',
                                            non_decreasing_weight=False,
                                            increasing_weight=True, )),
+
+    # stopping variant (reporter)
+    asha_stop=(async_mqSuccessiveHalving_stopping, 'async'),  # stopping variant asha
+    ahb_stop=(async_mqHyperband_stopping, 'async'),  # hb + stopping variant asha
+    amfesv20_stop=(async_mqMFES_stopping, 'async', dict(use_weight_init=True,    # from v20
+                                                        weight_init_choosing='proportional',
+                                                        weight_method='rank_loss_p_norm',
+                                                        non_decreasing_weight=False,
+                                                        increasing_weight=True, )),
+    amfesv19_stop=(async_mqMFES_stopping, 'async', dict(use_weight_init=False,   # from v19
+                                                        weight_method='rank_loss_p_norm',
+                                                        non_decreasing_weight=False,
+                                                        increasing_weight=True, )),
 
     # exp version:
     mfesv5=(mqMFES_v5, 'sync'),

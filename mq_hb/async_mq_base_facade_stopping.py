@@ -146,6 +146,7 @@ class async_mqBaseFacade_stopping(object):
                         sender_messager.send_message(msg)
                     except Exception:
                         self.logger.error('Send decision error: %s' % traceback.format_exc())
+                    self.logger.info('Num of senders: %d' % len(self.sender_dict))
 
         except Exception as e:
             print(e)

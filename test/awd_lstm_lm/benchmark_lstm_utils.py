@@ -8,9 +8,11 @@ from multiprocessing import Process, Manager
 
 from mq_hb.mq_mf_worker_gpu import mqmfWorker_gpu
 from mq_hb.async_mq_mf_worker_gpu import async_mqmfWorker_gpu
+from mq_hb.async_mq_mf_worker_stopping_gpu import async_mqmfWorker_stopping_gpu
 from test.utils import setup_exp, seeds
 from test.benchmark_process_record import remove_partial, get_incumbent
-from lstm_obj import get_corpus, get_lstm_configspace, mf_objective_func_gpu
+from lstm_obj import get_corpus, get_lstm_configspace, mf_objective_func_gpu, mf_objective_func_gpu_stopping
+from mq_hb import stopping_mths
 
 
 def evaluate_parallel(algo_class, algo_kwargs, method_id, n_workers, dataset, seed, ip, port,
@@ -26,12 +28,19 @@ def evaluate_parallel(algo_class, algo_kwargs, method_id, n_workers, dataset, se
     print('ip=', ip, 'port=', port)
     assert parallel_strategy in ['sync', 'async']
 
+    stopping_variant = algo_class in stopping_mths
+    print('stopping_variant =', stopping_variant)
+
     data_path = './test/awd-lstm-lm/data/penn'
     corpus = get_corpus(data_path)
 
     model_dir = os.path.join('./data/lstm_save_models', method_id)
-    objective_function_gpu = partial(mf_objective_func_gpu, total_resource=R, run_test=run_test,
-                                     model_dir=model_dir, eta=eta, corpus=corpus)
+    if stopping_variant:
+        objective_function_gpu = partial(mf_objective_func_gpu_stopping, total_resource=R, run_test=run_test,
+                                         model_dir=model_dir, eta=eta, corpus=corpus)
+    else:
+        objective_function_gpu = partial(mf_objective_func_gpu, total_resource=R, run_test=run_test,
+                                         model_dir=model_dir, eta=eta, corpus=corpus)
 
     def master_run(return_list, algo_class, algo_kwargs):
         algo_kwargs['ip'] = ''
@@ -54,7 +63,22 @@ def evaluate_parallel(algo_class, algo_kwargs, method_id, n_workers, dataset, se
 
     def worker_run(i):
         device = 'cuda:%d' % i  # gpu
-        if parallel_strategy == 'sync':
+        if stopping_variant:
+            assert parallel_strategy == 'async'
+            self_port = port + 10 + i
+            for _ in range(10):
+                try:
+                    self_port += n_workers
+                    print('worker try self_port:', self_port)
+                    worker = async_mqmfWorker_stopping_gpu(objective_function_gpu, device, ip, port,
+                                                           self_ip='127.0.0.1', self_port=self_port)
+                except EOFError:
+                    print('EOFError: try next port.')
+                else:
+                    break
+            else:
+                raise EOFError('Cannot init worker.')
+        elif parallel_strategy == 'sync':
             worker = mqmfWorker_gpu(objective_function_gpu, device, ip, port)
         elif parallel_strategy == 'async':
             worker = async_mqmfWorker_gpu(objective_function_gpu, device, ip, port)

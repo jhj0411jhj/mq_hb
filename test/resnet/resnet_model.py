@@ -126,6 +126,7 @@ class BaseImgClassificationNeuralNetwork(BaseNeuralNetwork):
         self.cur_epoch_num = 0
 
     def fit(self, dataset, mode='fit'):
+        assert mode in ['fit', 'continue']
         from sklearn.metrics import accuracy_score
 
         assert self.model is not None
@@ -170,6 +171,10 @@ class BaseImgClassificationNeuralNetwork(BaseNeuralNetwork):
             #     self.scheduler = scheduler
             #     self.early_stop = early_stop
             #     return self
+        elif mode == 'continue':
+            print('continue training.')
+            optimizer = self.optimizer_
+            scheduler = self.scheduler
 
         for epoch in range(int(self.cur_epoch_num), int(self.cur_epoch_num) + int(self.epoch_num)):
             self.model.train()
@@ -301,13 +306,15 @@ class BaseImgClassificationNeuralNetwork(BaseNeuralNetwork):
 
 class ResNet32Classifier(BaseImgClassificationNeuralNetwork):
 
-    def fit(self, dataset):
+    def fit(self, dataset, mode='fit'):
+        assert mode in ['fit', 'continue']
         from resnet_util import resnet32
         if self.grayscale:
             raise ValueError("Only support RGB inputs!")
-        self.model = resnet32(num_classes=len(dataset.train_dataset.classes))
-        self.model.to(self.device)
-        super().fit(dataset)
+        if mode == 'fit':
+            self.model = resnet32(num_classes=len(dataset.train_dataset.classes))
+            self.model.to(self.device)
+        super().fit(dataset, mode)
         return self
 
     def set_empty_model(self, dataset):

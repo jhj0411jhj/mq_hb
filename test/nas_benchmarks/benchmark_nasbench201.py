@@ -20,7 +20,7 @@ from test.nas_benchmarks.nasbench201_utils import load_nasbench201, get_nasbench
 from test.nas_benchmarks.simulation_utils import run_in_parallel, run_async
 from test.utils import seeds, timeit
 from test.benchmark_process_record import remove_partial, get_incumbent
-from mq_hb import mth_dict
+from mq_hb import mth_dict, stopping_mths
 
 dataset_choices = ['cifar10-valid', 'cifar10', 'cifar100', 'ImageNet16-120', 'all']
 parser = argparse.ArgumentParser()
@@ -62,6 +62,11 @@ def evaluate_simulation(algo_class, algo_kwargs, method_id, n_workers, seed, par
     print(method_id, n_workers, seed)
 
     assert parallel_strategy in ['sync', 'async']
+
+    stopping_variant = algo_class in stopping_mths
+    # print('stopping_variant =', stopping_variant)
+    if stopping_variant:
+        raise NotImplementedError
 
     if parallel_strategy == 'sync':
         algo_class.run_in_parallel = run_in_parallel

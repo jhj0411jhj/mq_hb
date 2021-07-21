@@ -16,6 +16,11 @@ class Reporter(object):
         self.port = port
         self.authkey = authkey
 
+        if logger is not None:
+            self.logging = logger.info
+        else:
+            self.logging = print
+
         # worker messager to report observation to master
         self.worker_messager = worker_messager
         # receiver messager to receive stop/continue message from master
@@ -27,10 +32,7 @@ class Reporter(object):
 
         self.meta_data = None
 
-        if logger is not None:
-            self.logging = logger.info
-        else:
-            self.logging = print
+
 
     def __call__(self, objective_value, n_iteration, time_taken, test_perf=None, ref_id=None, early_stop=False):
         trial_state = SUCCESS   # todo

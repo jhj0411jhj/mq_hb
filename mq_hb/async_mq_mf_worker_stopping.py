@@ -55,15 +55,17 @@ class async_mqmfWorker_stopping(object):
                 return
 
             # Get config
-            try:
-                msg = self.worker_messager.receive_message()
-            except Exception as e:
-                self.logging("Worker receive message error: %s" % str(e))
-                return
-            if msg is None:
-                # Wait for configs
-                time.sleep(self.sleep_time)
-                continue
+            while True:
+                try:
+                    msg = self.worker_messager.receive_message()
+                except Exception as e:
+                    self.logging("Worker receive message error: %s" % str(e))
+                    return
+                if msg is None:
+                    # Wait for configs
+                    time.sleep(self.sleep_time)
+                else:
+                    break
             self.logging("Worker: get msg: %s. start working." % msg)
             config, extra_conf, time_limit_per_trial, n_iteration, trial_id = msg
 

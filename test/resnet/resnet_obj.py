@@ -122,6 +122,55 @@ def mf_objective_func_gpu(config, n_resource, extra_conf, device, total_resource
     return result
 
 
+def mf_objective_func_gpu_stopping(config, n_resource, extra_conf, reporter,
+                                   device, total_resource, run_test=False,
+                                   model_dir=None, eta=3):    # device='cuda' 'cuda:0'
+    print('extra_conf:', extra_conf)
+
+    data_transforms = get_transforms(image_size=image_size)
+    image_data.load_data(data_transforms['train'], data_transforms['val'])
+    start_time = time.time()
+
+    config_dict = config.get_dictionary().copy()
+    estimator = get_estimator(config_dict, max_epoch, device=device)
+
+    initial_run = True
+    while True:
+        print('n_resource:', n_resource)
+        t0 = time.time()
+        epoch_ratio = float(n_resource) / float(total_resource)
+
+        # Continue training if initial_run=False
+        if not initial_run:
+            estimator.epoch_num = ceil(estimator.max_epoch * epoch_ratio) - ceil(
+                estimator.max_epoch * epoch_ratio / eta)
+            print(estimator.epoch_num)
+        else:
+            estimator.epoch_num = ceil(estimator.max_epoch * epoch_ratio)
+
+        try:
+            mode = 'fit' if initial_run else 'continue'
+            score = dl_holdout_validation(estimator, scorer, image_data, random_state=1, run_test=False,
+                                          mode=mode)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            score = -MAXINT
+        print('Evaluation | Score: %.4f | Time cost: %.2f seconds' %
+              (scorer._sign * score,
+               time.time() - start_time))
+        print(str(config))
+
+        # Turn it into a minimization problem.
+        n_resource = reporter(
+            objective_value=-score,
+            n_iteration=n_resource,
+            time_taken=time.time() - t0,
+            test_perf=None,
+        )
+        initial_run = False
+
+
 def dl_holdout_validation(estimator, scorer, dataset, random_state=1, run_test=False, **kwargs):
     start_time = time.time()
     with warnings.catch_warnings():
