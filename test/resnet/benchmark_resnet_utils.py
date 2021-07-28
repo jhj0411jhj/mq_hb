@@ -12,13 +12,13 @@ from mq_hb.async_mq_mf_worker_stopping_gpu import async_mqmfWorker_stopping_gpu
 from test.utils import setup_exp, seeds
 from test.benchmark_process_record import remove_partial, get_incumbent
 from resnet_obj import mf_objective_func_gpu, mf_objective_func_gpu_stopping
-from resnet_model import ResNet32Classifier
+from resnet_model import ResNetClassifier
 from mq_hb import stopping_mths
 
 
 def evaluate_parallel(algo_class, algo_kwargs, method_id, n_workers, dataset, seed, ip, port,
                       parallel_strategy, n_jobs, R, eta=3, run_test=True,
-                      dir_path=None, file_name=None):
+                      dir_path=None, file_name=None, resnet_depth=32):
     # dataset / n_jobs are ignored
     assert dir_path is not None
     assert file_name is not None
@@ -35,10 +35,10 @@ def evaluate_parallel(algo_class, algo_kwargs, method_id, n_workers, dataset, se
     model_dir = os.path.join('./data/resnet_save_models', method_id)
     if stopping_variant:
         objective_function_gpu = partial(mf_objective_func_gpu_stopping, total_resource=R, run_test=run_test,
-                                         model_dir=model_dir, eta=eta)
+                                         resnet_depth=resnet_depth)
     else:
         objective_function_gpu = partial(mf_objective_func_gpu, total_resource=R, run_test=run_test,
-                                         model_dir=model_dir, eta=eta)
+                                         model_dir=model_dir, eta=eta, resnet_depth=resnet_depth)
 
     def master_run(return_list, algo_class, algo_kwargs):
         algo_kwargs['ip'] = ''
@@ -106,10 +106,16 @@ def evaluate_parallel(algo_class, algo_kwargs, method_id, n_workers, dataset, se
 
 def run_exp(dataset, algo_class, algo_kwargs, algo_name, n_workers, parallel_strategy,
             R, n_jobs, runtime_limit, time_limit_per_trial, start_id, rep, ip, port,
-            eta=3, pre_sample=False, run_test=False):
+            eta=3, pre_sample=False, run_test=False, model='resnet'):
     # n_jobs / pre_sample are ignored
     assert dataset == 'cifar10'
-    model = 'resnet'
+    assert model in ['resnet', 'resnet20']
+    if model == 'resnet':
+        resnet_depth = 32
+    elif model == 'resnet20':
+        resnet_depth = 20
+    else:
+        raise ValueError
 
     # setup
     print('===== start eval %s: rep=%d, n_jobs=%d, runtime_limit=%d, time_limit_per_trial=%d'
@@ -123,7 +129,7 @@ def run_exp(dataset, algo_class, algo_kwargs, algo_name, n_workers, parallel_str
 
         # ip, port are filled in evaluate_parallel()
         algo_kwargs['objective_func'] = None
-        algo_kwargs['config_space'] = ResNet32Classifier.get_hyperparameter_search_space()
+        algo_kwargs['config_space'] = ResNetClassifier.get_hyperparameter_search_space()
         algo_kwargs['random_state'] = seed
         algo_kwargs['method_id'] = method_id
         algo_kwargs['runtime_limit'] = runtime_limit
@@ -135,7 +141,7 @@ def run_exp(dataset, algo_class, algo_kwargs, algo_name, n_workers, parallel_str
         recorder = evaluate_parallel(
             algo_class, algo_kwargs, method_id, n_workers, dataset, seed, ip, port,
             parallel_strategy, n_jobs, R, eta=eta, run_test=run_test,
-            dir_path=dir_path, file_name=file_name,
+            dir_path=dir_path, file_name=file_name, resnet_depth=resnet_depth,
         )
 
         try:

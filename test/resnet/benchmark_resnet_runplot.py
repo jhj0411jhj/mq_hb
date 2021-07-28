@@ -26,7 +26,7 @@ from mq_hb import mth_dict
 from mq_hb.mq_mf_worker_gpu import mqmfWorker_gpu
 from mq_hb.async_mq_mf_worker_gpu import async_mqmfWorker_gpu
 from test.utils import setup_exp, seeds
-from resnet_model import ResNet32Classifier
+from resnet_model import ResNetClassifier
 
 import torch
 from math import ceil, log
@@ -123,7 +123,7 @@ def mf_objective_func_gpu(config, n_resource, extra_conf, device, total_resource
 
     config_dict = config.get_dictionary().copy()
 
-    estimator = get_estimator(config_dict, max_epoch, device=device)
+    estimator = get_estimator(config_dict, max_epoch, device=device, resnet_depth=32)
 
     epoch_ratio = float(n_resource) / float(total_resource)
 
@@ -268,7 +268,7 @@ for i in range(start_id, start_id + rep):
 
     # ip, port are filled in evaluate_parallel()
     algo_kwargs['objective_func'] = None
-    algo_kwargs['config_space'] = ResNet32Classifier.get_hyperparameter_search_space()
+    algo_kwargs['config_space'] = ResNetClassifier.get_hyperparameter_search_space()
     algo_kwargs['random_state'] = seed
     algo_kwargs['method_id'] = method_id
     algo_kwargs['runtime_limit'] = runtime_limit

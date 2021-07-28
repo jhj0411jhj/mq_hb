@@ -213,7 +213,7 @@ class async_mqMFES_stopping(async_mqHyperband_stopping):
         results_train = np.array(std_normalization(results_train), dtype=np.float64)
         surrogate.train(convert_configurations_to_array(configs_train), results_train, r=n_iteration)
 
-    def decide_stopping(self, config, perf, n_iteration):   # todo
+    def decide_stopping(self, config, perf, n_iteration):
         decision = super().decide_stopping(config, perf, n_iteration)
 
         n_iteration = int(n_iteration)

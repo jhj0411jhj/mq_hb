@@ -58,7 +58,7 @@ class RandomSampling(object):
 
 class mf_RandomSampling(object):
 
-    def __init__(self, acquisition_function, config_space, max_resource, n_samples=5000, rng=None):
+    def __init__(self, acquisition_function, config_space, max_resource, log_scale=True, n_samples=5000, rng=None):
         """
         Samples candidates uniformly at random and returns the point with the highest objective value.
 
@@ -68,6 +68,8 @@ class mf_RandomSampling(object):
             The acquisition function which will be maximized
         n_samples: int
             Number of candidates that are samples
+        log_scale: bool
+            Convert log scale resource.
         """
         self.config_space = config_space
         self.acquisition_function = acquisition_function
@@ -77,6 +79,7 @@ class mf_RandomSampling(object):
             self.rng = rng
         self.n_samples = n_samples
         self.max_resource = max_resource
+        self.log_scale = log_scale
 
     def maximize(self, resource, best_config, batch_size=1):
         """
@@ -104,7 +107,8 @@ class mf_RandomSampling(object):
 
         configs_list = incs_configs + rand_configs
         resource_list = [resource] * len(configs_list)
-        config_array = convert_configurations_to_resource_array(configs_list, resource_list, self.max_resource)
+        config_array = convert_configurations_to_resource_array(configs_list, resource_list, self.max_resource,
+                                                                log_scale=self.log_scale)
 
         y = self.acquisition_function(config_array, convert=False)
         y = y.reshape(-1)

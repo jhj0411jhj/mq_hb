@@ -16,6 +16,7 @@ sys.path.insert(1, "../open-box")    # for dependency
 from test.utils import seeds
 
 parser = argparse.ArgumentParser()
+parser.add_argument('--model', type=str, default='resnet')
 parser.add_argument('--dataset', type=str, default='cifar10')
 parser.add_argument('--mth', type=str, default='hyperband-n4')
 parser.add_argument('--rep', type=int, default=1)
@@ -23,12 +24,19 @@ parser.add_argument('--start_id', type=int, default=0)
 parser.add_argument('--runtime_limit', type=int, default=172800)
 
 args = parser.parse_args()
+model = args.model
 dataset = args.dataset
 mth = args.mth
 rep = args.rep
 start_id = args.start_id
 runtime_limit = args.runtime_limit
-model = 'resnet'
+
+if model == 'resnet':
+    resnet_depth = 32
+elif model == 'resnet20':
+    resnet_depth = 20
+else:
+    raise ValueError
 
 try:
     from sklearn.metrics.scorer import accuracy_scorer
@@ -61,7 +69,7 @@ def test_func(config, device='cuda'):    # device='cuda' 'cuda:0'
 
     config_dict = config.get_dictionary().copy()
 
-    estimator = get_estimator(config_dict, max_epoch, device=device)
+    estimator = get_estimator(config_dict, max_epoch, device=device, resnet_depth=resnet_depth)
 
     estimator.epoch_num = estimator.max_epoch
 

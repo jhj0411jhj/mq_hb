@@ -35,18 +35,23 @@ from mq_hb.async_mq_mfes_s import async_mqMFES_s
 from mq_hb.async_mq_sh_stopping import async_mqSuccessiveHalving_stopping
 from mq_hb.async_mq_hb_stopping import async_mqHyperband_stopping
 from mq_hb.async_mq_mfes_stopping import async_mqMFES_stopping
+from mq_hb.async_mq_median_stopping import async_mqMedianStopping
+from mq_hb.async_mq_median_stopping_mfes import async_mqMFES_MedianStopping
+from mq_hb.async_mq_median_stopping_mfgp import async_mqMFGP_MedianStopping
 
 from mq_hb.mq_mfes_v5 import mqMFES_v5
 from mq_hb.mq_mfes_v6 import mqMFES_v6
 from mq_hb.mq_mfes_v7 import mqMFES_v7
 from mq_hb.mq_mfes_v8 import mqMFES_v8
-from mq_hb.async_mq_mfes_v24 import async_mqMFES_v24
 
 # stopping variant (reporter)
 stopping_mths = [
     async_mqSuccessiveHalving_stopping,
     async_mqHyperband_stopping,
     async_mqMFES_stopping,
+    async_mqMedianStopping,
+    async_mqMFES_MedianStopping,
+    async_mqMFGP_MedianStopping,
 ]
 
 mth_dict = dict(
@@ -106,6 +111,12 @@ mth_dict = dict(
                                                         weight_method='rank_loss_p_norm',
                                                         non_decreasing_weight=False,
                                                         increasing_weight=True, )),
+    # median stopping (reporter)
+    ams=(async_mqMedianStopping, 'async', dict()),
+    amfes_ms=(async_mqMFES_MedianStopping, 'async', dict(weight_method='rank_loss_p_norm',
+                                                         non_decreasing_weight=False,
+                                                         increasing_weight=True, )),
+    amfgp_ms=(async_mqMFGP_MedianStopping, 'async', dict()),
 
     # exp version:
     mfesv5=(mqMFES_v5, 'sync'),
@@ -177,13 +188,6 @@ mth_dict = dict(
                                            non_decreasing_weight=False,
                                            increasing_weight=True,
                                            surrogate_type='gp', )),
-    amfesv23=(async_mqMFES, 'async', dict(init_weight=[1.0, 0, 0, 0],  # todo
-                                          use_weight_init=True,
-                                          weight_init_choosing='proportional',
-                                          weight_method='rank_loss_p_norm',
-                                          non_decreasing_weight=False,
-                                          increasing_weight=True, )),
-    amfesv24=(async_mqMFES_v24, 'async'),   # stage asha
     amfesv25=(async_mqMFES, 'async', dict(use_weight_init=True,
                                           weight_init_choosing='proportional',
                                           weight_method='rank_loss_p_norm',

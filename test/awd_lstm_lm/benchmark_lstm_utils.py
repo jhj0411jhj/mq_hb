@@ -37,7 +37,7 @@ def evaluate_parallel(algo_class, algo_kwargs, method_id, n_workers, dataset, se
     model_dir = os.path.join('./data/lstm_save_models', method_id)
     if stopping_variant:
         objective_function_gpu = partial(mf_objective_func_gpu_stopping, total_resource=R, run_test=run_test,
-                                         model_dir=model_dir, eta=eta, corpus=corpus)
+                                         corpus=corpus)
     else:
         objective_function_gpu = partial(mf_objective_func_gpu, total_resource=R, run_test=run_test,
                                          model_dir=model_dir, eta=eta, corpus=corpus)

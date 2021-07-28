@@ -134,6 +134,7 @@ def mf_objective_func_gpu(config, n_resource, extra_conf, device, total_resource
         if not os.path.exists(config_model_path):
             raise ValueError('not initial_run but config_model_path not exists. check if exists duplicated configs '
                              'and saved model were removed.')
+        st = time.time()
         model, criterion, optimizer, init_epoch_num = model_load(config_model_path)
         optimizer.param_groups[0]['lr'] = lr
         model.dropouti, model.dropouth, model.dropout, dropoute = dropouti, dropouth, dropout, dropoute
@@ -148,6 +149,7 @@ def mf_objective_func_gpu(config, n_resource, extra_conf, device, total_resource
 
         epoch_num = ceil(max_epoch * epoch_ratio) - ceil(
             max_epoch * epoch_ratio / eta)
+        print('Resuming time: %.2fs' % (time.time() - st))
     else:
         init_epoch_num = 1
         epoch_num = ceil(max_epoch * epoch_ratio)
@@ -242,8 +244,7 @@ def mf_objective_func_gpu(config, n_resource, extra_conf, device, total_resource
 
 
 def mf_objective_func_gpu_stopping(config, n_resource, extra_conf, reporter,
-                                   device, total_resource, run_test=False,
-                                   model_dir='./data/lstm_save_models/unnamed_trial', eta=3, corpus=None):  # device='cuda' 'cuda:0'
+                                   device, total_resource, run_test=False, corpus=None):  # device='cuda' 'cuda:0'
     assert corpus is not None
 
     print('extra_conf:', extra_conf)
@@ -314,8 +315,7 @@ def mf_objective_func_gpu_stopping(config, n_resource, extra_conf, reporter,
                     elif rnn.zoneout > 0:
                         rnn.zoneout = wdrop
 
-            epoch_num = ceil(max_epoch * epoch_ratio) - ceil(
-                max_epoch * epoch_ratio / eta)
+            epoch_num = ceil(max_epoch * epoch_ratio) - (init_epoch_num - 1)
         else:
             init_epoch_num = 1
             epoch_num = ceil(max_epoch * epoch_ratio)

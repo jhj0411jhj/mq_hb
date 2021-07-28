@@ -10,7 +10,7 @@ from openbox.surrogate.base.gp_kernels import ConstantKernel, Matern, HammingKer
 
 
 def convert_configurations_to_resource_array(configs: List[Configuration], resources: List[int],
-                                             max_resource: int) -> np.ndarray:
+                                             max_resource: int, log_scale=True) -> np.ndarray:
     """Impute inactive hyperparameters in configurations with their default. Add a feature for amount of resources
 
     Necessary to apply an EPM to the data.
@@ -23,6 +23,8 @@ def convert_configurations_to_resource_array(configs: List[Configuration], resou
         List of configuration resources.
     max_resource: int
         The maximum amount of resources.
+    log_scale: bool
+        Convert log scale resource.
 
     Returns
     -------
@@ -34,7 +36,10 @@ def convert_configurations_to_resource_array(configs: List[Configuration], resou
                              dtype=np.float64)
     configuration_space = configs[0].configuration_space
     config_features = impute_default_values(configuration_space, configs_array)
-    resource_features = np.array([[log(resource) / log(max_resource)] for resource in resources])
+    if log_scale:
+        resource_features = np.array([[log(resource) / log(max_resource)] for resource in resources])
+    else:
+        resource_features = np.array([[resource / max_resource] for resource in resources])
     result = np.hstack([config_features, resource_features])
     return result
 

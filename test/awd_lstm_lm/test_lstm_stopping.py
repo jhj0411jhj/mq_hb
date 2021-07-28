@@ -29,7 +29,6 @@ if __name__ == '__main__':
     extra_conf = dict()
     result = mf_objective_func_gpu_stopping(default_config, 1, extra_conf, ordinary_reporter,
                                             device='cuda:0', total_resource=R,
-                                            model_dir=None,
-                                            eta=eta, corpus=corpus)
+                                            corpus=corpus)
     print(result)
 

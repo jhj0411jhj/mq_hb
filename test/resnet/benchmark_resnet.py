@@ -18,6 +18,7 @@ from mq_hb import mth_dict
 from benchmark_resnet_utils import run_exp
 
 parser = argparse.ArgumentParser()
+parser.add_argument('--model', type=str, default='resnet', choices=['resnet', 'resnet20'])
 parser.add_argument('--mth', type=str, default='hyperband')
 parser.add_argument('--dataset', type=str, default='cifar10')
 parser.add_argument('--R', type=int, default=27)
@@ -35,6 +36,7 @@ parser.add_argument('--rep', type=int, default=1)
 parser.add_argument('--start_id', type=int, default=0)
 
 args = parser.parse_args()
+model = args.model
 algo_name = args.mth
 dataset = args.dataset
 R = args.R
@@ -79,4 +81,4 @@ if algo_class in (mqRandomSearch, mqBO):
 
 run_exp(dataset, algo_class, algo_kwargs, algo_name, n_workers, parallel_strategy,
         R, n_jobs, runtime_limit, time_limit_per_trial, start_id, rep, ip, port,
-        eta=eta, pre_sample=False, run_test=True)
+        eta=eta, pre_sample=False, run_test=True, model=model)

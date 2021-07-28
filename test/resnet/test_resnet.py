@@ -1,7 +1,7 @@
 from resnet_obj import mf_objective_func_gpu
-from resnet_model import ResNet32Classifier
+from resnet_model import ResNetClassifier
 
-test_config = ResNet32Classifier.get_hyperparameter_search_space().get_default_configuration()
+test_config = ResNetClassifier.get_hyperparameter_search_space().get_default_configuration()
 
 extra_conf = dict(initial_run=True)
 mf_objective_func_gpu(config=test_config, n_resource=27, extra_conf=extra_conf,

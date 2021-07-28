@@ -304,24 +304,33 @@ class BaseImgClassificationNeuralNetwork(BaseNeuralNetwork):
         return score
 
 
-class ResNet32Classifier(BaseImgClassificationNeuralNetwork):
+class ResNetClassifier(BaseImgClassificationNeuralNetwork):
+
+    def __init__(self, resnet_depth, *args, **kwargs):
+        from resnet_util import resnet32, resnet20
+        if resnet_depth == 32:
+            self.resnet_class = resnet32
+        elif resnet_depth == 20:
+            self.resnet_class = resnet20
+        else:
+            raise ValueError
+        print('Resnet depth: %d' % resnet_depth)
+        super().__init__(*args, **kwargs)
 
     def fit(self, dataset, mode='fit'):
         assert mode in ['fit', 'continue']
-        from resnet_util import resnet32
         if self.grayscale:
             raise ValueError("Only support RGB inputs!")
         if mode == 'fit':
-            self.model = resnet32(num_classes=len(dataset.train_dataset.classes))
+            self.model = self.resnet_class(num_classes=len(dataset.train_dataset.classes))
             self.model.to(self.device)
         super().fit(dataset, mode)
         return self
 
     def set_empty_model(self, dataset):
-        from resnet_util import resnet32
         if self.grayscale:
             raise ValueError("Only support RGB inputs!")
-        self.model = resnet32(num_classes=len(dataset.classes))
+        self.model = self.resnet_class(num_classes=len(dataset.classes))
 
 
 def check_true(p):
@@ -351,7 +360,7 @@ def check_for_bool(p):
         raise ValueError("%s is not a bool" % str(p))
 
 
-def get_estimator(config, max_epoch, device='cpu'):
+def get_estimator(config, max_epoch, device='cpu', resnet_depth=32):
     config_ = config.copy()
     config_['random_state'] = 1
     config_['epoch_num'] = max_epoch
@@ -366,7 +375,7 @@ def get_estimator(config, max_epoch, device='cpu'):
         new_config[_key] = config_[key]
 
     try:
-        estimator = ResNet32Classifier(**new_config)
+        estimator = ResNetClassifier(resnet_depth=resnet_depth, **new_config)
     except Exception as e:
         raise ValueError('Create estimator error: %s' % str(e))
 

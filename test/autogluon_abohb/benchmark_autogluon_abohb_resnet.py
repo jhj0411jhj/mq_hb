@@ -133,7 +133,7 @@ def objective_function(args, reporter):
     device = 'cuda'
     data_transforms = get_transforms(image_size=image_size)
     image_data.load_data(data_transforms['train'], data_transforms['val'])
-    estimator = get_estimator(config_dict, max_epoch, device=device)
+    estimator = get_estimator(config_dict, max_epoch, device=device, resnet_depth=32)
 
     total_resource = args.epochs
     for idx, n_resource in enumerate(iterate_r):

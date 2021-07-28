@@ -22,13 +22,13 @@ image_size = 32
 data_dir = './datasets/img_datasets/cifar10/'
 image_data = ImageDataset(data_path=data_dir, train_val_split=True, image_size=image_size)
 
-from resnet_model import ResNet32Classifier
+from resnet_model import ResNetClassifier
 
-test_config = ResNet32Classifier.get_hyperparameter_search_space().get_default_configuration()
+test_config = ResNetClassifier.get_hyperparameter_search_space().get_default_configuration()
 
 
 def mf_objective_func_gpu(config, n_resource, extra_conf, device, total_resource, run_test=False,
-                          model_dir='./data/resnet_save_models/unnamed_trial', eta=3):    # device='cuda' 'cuda:0'
+                          model_dir='./data/resnet_save_models/unnamed_trial', eta=3, resnet_depth=32):    # device='cuda' 'cuda:0'
     print('extra_conf:', extra_conf)
     initial_run = extra_conf['initial_run']
     try:
@@ -43,7 +43,7 @@ def mf_objective_func_gpu(config, n_resource, extra_conf, device, total_resource
 
     config_dict = config.get_dictionary().copy()
 
-    estimator = get_estimator(config_dict, max_epoch, device=device)
+    estimator = get_estimator(config_dict, max_epoch, device=device, resnet_depth=resnet_depth)
 
     epoch_ratio = float(n_resource) / float(total_resource)
 
@@ -123,8 +123,7 @@ def mf_objective_func_gpu(config, n_resource, extra_conf, device, total_resource
 
 
 def mf_objective_func_gpu_stopping(config, n_resource, extra_conf, reporter,
-                                   device, total_resource, run_test=False,
-                                   model_dir=None, eta=3):    # device='cuda' 'cuda:0'
+                                   device, total_resource, run_test=False, resnet_depth=32):    # device='cuda' 'cuda:0'
     print('extra_conf:', extra_conf)
 
     data_transforms = get_transforms(image_size=image_size)
@@ -132,21 +131,18 @@ def mf_objective_func_gpu_stopping(config, n_resource, extra_conf, reporter,
     start_time = time.time()
 
     config_dict = config.get_dictionary().copy()
-    estimator = get_estimator(config_dict, max_epoch, device=device)
+    estimator = get_estimator(config_dict, max_epoch, device=device, resnet_depth=resnet_depth)
 
     initial_run = True
+    last_epoch = 0
     while True:
         print('n_resource:', n_resource)
         t0 = time.time()
         epoch_ratio = float(n_resource) / float(total_resource)
 
         # Continue training if initial_run=False
-        if not initial_run:
-            estimator.epoch_num = ceil(estimator.max_epoch * epoch_ratio) - ceil(
-                estimator.max_epoch * epoch_ratio / eta)
-            print(estimator.epoch_num)
-        else:
-            estimator.epoch_num = ceil(estimator.max_epoch * epoch_ratio)
+        estimator.epoch_num = ceil(estimator.max_epoch * epoch_ratio) - last_epoch
+        print(estimator.epoch_num)
 
         try:
             mode = 'fit' if initial_run else 'continue'
@@ -169,6 +165,7 @@ def mf_objective_func_gpu_stopping(config, n_resource, extra_conf, reporter,
             test_perf=None,
         )
         initial_run = False
+        last_epoch += estimator.cur_epoch_num
 
 
 def dl_holdout_validation(estimator, scorer, dataset, random_state=1, run_test=False, **kwargs):
