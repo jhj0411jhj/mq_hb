@@ -17,7 +17,7 @@ from functools import partial
 sys.path.insert(0, ".")
 sys.path.insert(1, "../open-box")    # for dependency
 from test.nas_benchmarks.nasbench201_utils import load_nasbench201, get_nasbench201_configspace, objective_func
-from test.nas_benchmarks.simulation_utils import run_in_parallel, run_async
+from test.nas_benchmarks.simulation_utils import run_in_parallel, run_async, run_async_stopping
 from test.utils import seeds, timeit
 from test.benchmark_process_record import remove_partial, get_incumbent
 from mq_hb import mth_dict, stopping_mths
@@ -64,11 +64,11 @@ def evaluate_simulation(algo_class, algo_kwargs, method_id, n_workers, seed, par
     assert parallel_strategy in ['sync', 'async']
 
     stopping_variant = algo_class in stopping_mths
-    # print('stopping_variant =', stopping_variant)
+    print('stopping_variant =', stopping_variant)
     if stopping_variant:
-        raise NotImplementedError
-
-    if parallel_strategy == 'sync':
+        assert parallel_strategy == 'async'
+        algo_class.run = run_async_stopping
+    elif parallel_strategy == 'sync':
         algo_class.run_in_parallel = run_in_parallel
     elif parallel_strategy == 'async':
         algo_class.run = run_async

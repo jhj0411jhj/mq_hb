@@ -124,7 +124,8 @@ class async_mqBaseFacade_stopping(object):
                     perf = return_info['loss']
                     t = time.time()
                     next_n_iteration = self.decide_stopping(config, perf, n_iteration)
-                    self.logger.info('decide_stopping() cost %.2fs.' % (time.time() - t,))
+                    self.logger.info('decide_stopping() cost %.2fs. decision: %s.'
+                                     % (time.time() - t, next_n_iteration))
                     self.recorder.append({'trial_id': trial_id, 'time_consumed': time_taken,
                                           'configuration': config, 'n_iteration': n_iteration,
                                           'return_info': return_info, 'global_time': global_time})

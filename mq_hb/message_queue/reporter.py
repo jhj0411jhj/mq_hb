@@ -32,8 +32,6 @@ class Reporter(object):
 
         self.meta_data = None
 
-
-
     def __call__(self, objective_value, n_iteration, time_taken, test_perf=None, ref_id=None, early_stop=False):
         trial_state = SUCCESS   # todo
         config = self.meta_data['config']

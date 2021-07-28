@@ -241,3 +241,138 @@ def run_async(self):
         print(traceback.format_exc())
         self.logger.error(traceback.format_exc())
 
+
+def run_async_stopping(self):
+    """
+    simulation function for async algorithms (stopping variants using Reporter)
+
+    n_workers: number of simulation workers
+
+    objective_func:
+        :param: config, n_iteration, extra_conf
+        :return: a dict that must contain: 'objective_value', 'elapsed_time'
+    """
+    assert hasattr(self, 'objective_func') and hasattr(self, 'n_workers')
+    try:
+        self.simulation_global_time = 0
+        worker_list = []
+        # init async: fill all workers
+        while len(worker_list) < self.n_workers:
+            # Send new job
+            t = time.time()
+            config, n_iteration, extra_conf = self.get_job()
+            self.logger.info('get_job() cost %.2fs.' % (time.time() - t,))
+            trial_id = self.global_trial_counter
+            self.global_trial_counter += 1
+            # query result
+            extra_conf['initial_run'] = True    # calculate train_time manually
+            result = self.objective_func(config, n_iteration, extra_conf)
+            return_info = dict(loss=result['objective_value'],
+                               n_iteration=n_iteration,
+                               ref_id=result.get('ref_id', None),
+                               early_stop=result.get('early_stop', False),
+                               trial_state=None,
+                               test_perf=result.get('test_perf', None),
+                               extra_conf=extra_conf)
+            last_train_time = 0.0
+            train_time = result['elapsed_time'] - last_train_time
+            observation = [return_info, train_time, trial_id, config]
+            job = dict(
+                observation=observation,
+                time_remaining=train_time,
+                total_train_time=result['elapsed_time'],
+            )
+            worker_list.append(job)
+            self.logger.info('Master send job: %s.' % (job,))
+
+        while True:
+            if self.runtime_limit is not None and self.simulation_global_time > self.runtime_limit:
+                self.logger.info('RUNTIME BUDGET is RUNNING OUT.')
+                return
+
+            # run job with least remaining time
+            worker_id = np.argmin([job['time_remaining'] for job in worker_list]).item()
+            run_job = worker_list.pop(worker_id)
+            run_time = run_job['time_remaining']
+            for job in worker_list:
+                job['time_remaining'] -= run_time
+                if job['time_remaining'] < 0:
+                    self.logger.warning('time_remaining %f < 0. please check!' % job['time_remaining'])
+                    job['time_remaining'] = 0
+            self.simulation_global_time += run_time
+            global_time = self.simulation_global_time
+            observation = run_job['observation']
+
+            return_info, time_taken, trial_id, config = observation
+            # decide stopping
+            self.logger.info('Master get observation: %s. Global time=%.2fs.' % (str(observation), global_time))
+            n_iteration = return_info['n_iteration']
+            perf = return_info['loss']
+            t = time.time()
+            next_n_iteration = self.decide_stopping(config, perf, n_iteration)
+            self.logger.info('decide_stopping() cost %.2fs. decision: %s.'
+                             % (time.time() - t, next_n_iteration))
+            if self.runtime_limit is None or global_time < self.runtime_limit:
+                self.recorder.append({'trial_id': trial_id, 'time_consumed': time_taken,
+                                      'configuration': config, 'n_iteration': n_iteration,
+                                      'return_info': return_info, 'global_time': global_time})
+            # if (not hasattr(self, 'R')) or n_iteration == self.R:
+            #     self.save_intermediate_statistics()
+
+            if next_n_iteration != -1:
+                # Continue training
+                n_iteration = next_n_iteration
+                extra_conf = return_info['extra_conf'].copy()
+                # query result
+                extra_conf['initial_run'] = True  # calculate train_time manually
+                result = self.objective_func(config, n_iteration, extra_conf)
+                return_info = dict(loss=result['objective_value'],
+                                   n_iteration=n_iteration,
+                                   ref_id=result.get('ref_id', None),
+                                   early_stop=result.get('early_stop', False),
+                                   trial_state=None,
+                                   test_perf=result.get('test_perf', None),
+                                   extra_conf=extra_conf)
+                last_train_time = run_job['total_train_time']
+                train_time = result['elapsed_time'] - last_train_time
+                observation = [return_info, train_time, trial_id, config]
+                job = dict(
+                    observation=observation,
+                    time_remaining=train_time,
+                    total_train_time=result['elapsed_time'],
+                )
+                worker_list.append(job)
+                self.logger.info('Master continue job: %s.' % (job,))
+            else:
+                # Stopping. Send new job
+                t = time.time()
+                config, n_iteration, extra_conf = self.get_job()
+                self.logger.info('get_job() cost %.2fs.' % (time.time() - t,))
+                trial_id = self.global_trial_counter
+                self.global_trial_counter += 1
+                # query result
+                extra_conf['initial_run'] = True  # calculate train_time manually
+                result = self.objective_func(config, n_iteration, extra_conf)
+                return_info = dict(loss=result['objective_value'],
+                                   n_iteration=n_iteration,
+                                   ref_id=result.get('ref_id', None),
+                                   early_stop=result.get('early_stop', False),
+                                   trial_state=None,
+                                   test_perf=result.get('test_perf', None),
+                                   extra_conf=extra_conf)
+                last_train_time = 0.0
+                train_time = result['elapsed_time'] - last_train_time
+                observation = [return_info, train_time, trial_id, config]
+                job = dict(
+                    observation=observation,
+                    time_remaining=train_time,
+                    total_train_time=result['elapsed_time'],
+                )
+                worker_list.append(job)
+                self.logger.info('Master send job: %s.' % (job,))
+
+    except Exception as e:
+        print(e)
+        print(traceback.format_exc())
+        self.logger.error(traceback.format_exc())
+
