@@ -117,6 +117,7 @@ mth_dict = dict(
                                                          non_decreasing_weight=False,
                                                          increasing_weight=True, )),
     amfgp_ms=(async_mqMFGP_MedianStopping, 'async', dict()),
+    amfgpbt_ms=(async_mqMFGP_MedianStopping, 'async', dict(use_botorch_gp=True)),
 
     # exp version:
     mfesv5=(mqMFES_v5, 'sync'),

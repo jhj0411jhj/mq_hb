@@ -134,6 +134,18 @@ def timeit(name=''):
     print("[%s]Total time = %d hours, %d minutes, %d seconds." % (name, h, m, s), flush=True)
 
 
+def parse_list_str(list_str: str, sep=',', map_func=int):
+    """
+    convert str to list
+    example:
+        parse_list_str('[1,2,3]', sep=',', map_func=int)  # -> [1, 2, 3]
+    """
+    if list_str[0] == '[':
+        assert list_str[-1] == ']'
+        list_str = list_str[1:-1]
+    return list(map(map_func, list_str.split(sep)))
+
+
 # ===== for plot =====
 
 def descending(x):

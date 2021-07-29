@@ -1,9 +1,6 @@
 import os
 import time
 import numpy as np
-from math import log, ceil
-from sklearn.model_selection import KFold
-from scipy.optimize import minimize
 from typing import List
 
 from mq_hb.async_mq_median_stopping import async_mqMedianStopping
@@ -37,6 +34,7 @@ class async_mqMFGP_MedianStopping(async_mqMedianStopping):
                  log_scale_model_iterations=False,
                  rand_prob=0.3,
                  bo_init_num=3,
+                 use_botorch_gp=False,
                  random_state=1,
                  method_id='mqAsyncMFGP_median',
                  restart_needed=True,
@@ -63,7 +61,11 @@ class async_mqMFGP_MedianStopping(async_mqMedianStopping):
         self.rng = np.random.RandomState(self.seed)
         types, bounds = get_types(config_space)
         self.num_hps = len(bounds)
-        self.surrogate = create_resource_gp_model('gp', config_space, types, bounds, self.rng)
+        if use_botorch_gp:
+            from mq_hb.surrogate.gp_botorch import GaussianProcess_BoTorch
+            self.surrogate = GaussianProcess_BoTorch(types, bounds, standardize_y=False)
+        else:
+            self.surrogate = create_resource_gp_model('gp', config_space, types, bounds, self.rng)
         self.acquisition_function = EI(model=self.surrogate)
         self.acq_optimizer = mf_RandomSampling(self.acquisition_function, config_space,
                                                max_resource=self.R,
