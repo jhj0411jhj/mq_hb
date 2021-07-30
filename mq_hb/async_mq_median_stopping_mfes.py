@@ -175,8 +175,9 @@ class async_mqMFES_MedianStopping(async_mqMedianStopping):
     def decide_stopping(self, config, perf, n_iteration):
         decision = super().decide_stopping(config, perf, n_iteration)
 
-        self.target_x[n_iteration].append(config)
-        self.target_y[n_iteration].append(perf)
+        if n_iteration in self.iterate_r:
+            self.target_x[n_iteration].append(config)
+            self.target_y[n_iteration].append(perf)
 
         if self.median_imputation is not None:
             raise NotImplementedError
