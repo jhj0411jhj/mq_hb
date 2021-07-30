@@ -53,6 +53,7 @@ class async_mqMFGP_MedianStopping(async_mqMedianStopping):
         self.iterate_r = model_iterations
         if self.iterate_r is None:
             self.iterate_r = self.stop_iterations
+        self.logger.info('model_iterations: %s.' % self.iterate_r)
 
         self.log_scale_model_iterations = log_scale_model_iterations
 

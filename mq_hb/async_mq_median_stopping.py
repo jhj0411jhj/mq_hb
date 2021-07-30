@@ -67,6 +67,8 @@ class async_mqMedianStopping(async_mqBaseFacade_stopping):
             self.stop_iterations = list(range(1, 1 + R))
         self.window_size = window_size  # size for perf averaging
         assert self.window_size is None or self.window_size > 0
+        self.logger.info('R: %d. window_size: %d. stop_iterations: %s.'
+                         % (self.R, self.window_size, self.stop_iterations))
 
         self.incumbent_configs = list()
         self.incumbent_perfs = list()

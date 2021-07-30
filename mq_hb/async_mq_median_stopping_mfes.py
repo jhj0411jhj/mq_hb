@@ -69,6 +69,7 @@ class async_mqMFES_MedianStopping(async_mqMedianStopping):
         self.iterate_r = model_iterations
         if self.iterate_r is None:
             self.iterate_r = self.stop_iterations
+        self.logger.info('model_iterations: %s.' % self.iterate_r)
 
         # test version
         self.test_random = test_random
