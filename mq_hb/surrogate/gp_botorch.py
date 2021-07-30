@@ -6,11 +6,17 @@ from botorch.fit import fit_gpytorch_model
 from gpytorch.mlls import ExactMarginalLogLikelihood
 from openbox.surrogate.base.base_model import AbstractModel
 from openbox.utils.constants import VERY_SMALL_NUMBER
+from openbox.utils.util_funcs import get_types
 
 
 class GaussianProcess_BoTorch(AbstractModel):
-    def __init__(self, types, bounds, standardize_y=False, **kwargs):
+    def __init__(self, config_space, standardize_y=False, **kwargs):
+        types, bounds = get_types(config_space)
+        # resource feature
+        types = np.hstack((types, [0])).astype(int)
+        bounds = np.vstack((bounds, [[0.0, 1.0]])).astype(float)
         super().__init__(types=types, bounds=bounds, **kwargs)
+
         self.tkwargs = {
             # use torch.float32 instead of torch.double
             # prevent gpytorch.utils.errors.NotPSDError in gp.posterior(), see 'gpytorch/utils/cholesky.py'

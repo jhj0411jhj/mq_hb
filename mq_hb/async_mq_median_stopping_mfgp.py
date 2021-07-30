@@ -64,7 +64,7 @@ class async_mqMFGP_MedianStopping(async_mqMedianStopping):
         self.num_hps = len(bounds)
         if use_botorch_gp:
             from mq_hb.surrogate.gp_botorch import GaussianProcess_BoTorch
-            self.surrogate = GaussianProcess_BoTorch(types, bounds, standardize_y=False)
+            self.surrogate = GaussianProcess_BoTorch(config_space, standardize_y=False)
         else:
             self.surrogate = create_resource_gp_model('gp', config_space, types, bounds, self.rng)
         self.acquisition_function = EI(model=self.surrogate)
