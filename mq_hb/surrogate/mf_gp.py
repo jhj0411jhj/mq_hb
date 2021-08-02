@@ -55,7 +55,7 @@ def create_resource_gp_model(model_type, config_space, types, bounds, rng):
     )
 
     # resource feature
-    types = np.hstack((types, [0])).astype(int)
+    types = np.hstack((types, [0])).astype(np.uint)
     bounds = np.vstack((bounds, [[0.0, 1.0]])).astype(float)
 
     cont_dims = np.nonzero(types == 0)[0].astype(np.int)

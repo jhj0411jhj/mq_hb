@@ -37,7 +37,7 @@ from mq_hb.async_mq_hb_stopping import async_mqHyperband_stopping
 from mq_hb.async_mq_mfes_stopping import async_mqMFES_stopping
 from mq_hb.async_mq_median_stopping import async_mqMedianStopping
 from mq_hb.async_mq_median_stopping_mfes import async_mqMFES_MedianStopping
-from mq_hb.async_mq_median_stopping_mfgp import async_mqMFGP_MedianStopping
+from mq_hb.async_mq_median_stopping_mfbo import async_mqMFBO_MedianStopping
 
 from mq_hb.mq_mfes_v5 import mqMFES_v5
 from mq_hb.mq_mfes_v6 import mqMFES_v6
@@ -51,7 +51,7 @@ stopping_mths = [
     async_mqMFES_stopping,
     async_mqMedianStopping,
     async_mqMFES_MedianStopping,
-    async_mqMFGP_MedianStopping,
+    async_mqMFBO_MedianStopping,
 ]
 
 mth_dict = dict(
@@ -116,8 +116,9 @@ mth_dict = dict(
     amfes_ms=(async_mqMFES_MedianStopping, 'async', dict(weight_method='rank_loss_p_norm',
                                                          non_decreasing_weight=False,
                                                          increasing_weight=True, )),
-    amfgp_ms=(async_mqMFGP_MedianStopping, 'async', dict()),
-    amfgpbt_ms=(async_mqMFGP_MedianStopping, 'async', dict(use_botorch_gp=True)),
+    amfgp_ms=(async_mqMFBO_MedianStopping, 'async', dict(surrogate_type='gp')),
+    amfgpbt_ms=(async_mqMFBO_MedianStopping, 'async', dict(surrogate_type='botorch_gp')),
+    amfprf_ms=(async_mqMFBO_MedianStopping, 'async', dict(surrogate_type='prf')),
 
     # exp version:
     mfesv5=(mqMFES_v5, 'sync'),

@@ -8,6 +8,7 @@ from mq_hb.utils import sample_configuration
 from mq_hb.utils import minmax_normalization, std_normalization
 
 from mq_hb.surrogate.mf_gp import convert_configurations_to_resource_array, create_resource_gp_model
+from openbox.surrogate.base.rf_with_instances import RandomForestWithInstances
 from mq_hb.acq_maximizer.ei_optimization import mf_RandomSampling
 
 from openbox.utils.util_funcs import get_types
@@ -15,11 +16,11 @@ from openbox.utils.config_space import ConfigurationSpace
 from openbox.acquisition_function.acquisition import EI
 
 
-class async_mqMFGP_MedianStopping(async_mqMedianStopping):
+class async_mqMFBO_MedianStopping(async_mqMedianStopping):
     """
-    The implementation of Asynchronous MFGP
+    The implementation of Asynchronous MFBO
     + Build model at model_iterations
-    + Use multi-fidelity GP
+    + Use multi-fidelity GP/prf
     median stopping variant
     + Report at each n_iteration in [1, R]
     + Decide stopping at n_iteration in stop_iterations
@@ -32,6 +33,7 @@ class async_mqMFGP_MedianStopping(async_mqMedianStopping):
                  window_size: int = None,
                  model_iterations: List = None,
                  log_scale_model_iterations=False,
+                 surrogate_type='prf',  # prf, gp, botorch_gp
                  rand_prob=0.3,
                  bo_init_num=3,
                  use_botorch_gp=False,
@@ -62,11 +64,19 @@ class async_mqMFGP_MedianStopping(async_mqMedianStopping):
         self.rng = np.random.RandomState(self.seed)
         types, bounds = get_types(config_space)
         self.num_hps = len(bounds)
-        if use_botorch_gp:
+        self.surrogate_type = surrogate_type
+        if self.surrogate_type == 'botorch_gp':
             from mq_hb.surrogate.gp_botorch import GaussianProcess_BoTorch
             self.surrogate = GaussianProcess_BoTorch(config_space, standardize_y=False)
-        else:
+        elif self.surrogate_type == 'gp':
             self.surrogate = create_resource_gp_model('gp', config_space, types, bounds, self.rng)
+        elif self.surrogate_type == 'prf':
+            # resource feature
+            types = np.hstack((types, [0])).astype(np.uint)
+            bounds = np.vstack((bounds, [[0.0, 1.0]]))  # Caution: for cat hp, bound[0] must be int.
+            self.surrogate = RandomForestWithInstances(types=types, bounds=bounds)
+        else:
+            raise ValueError('Unknown surrogate_type: %s' % self.surrogate_type)
         self.acquisition_function = EI(model=self.surrogate)
         self.acq_optimizer = mf_RandomSampling(self.acquisition_function, config_space,
                                                max_resource=self.R,

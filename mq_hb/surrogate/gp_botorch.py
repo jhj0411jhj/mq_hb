@@ -13,7 +13,7 @@ class GaussianProcess_BoTorch(AbstractModel):
     def __init__(self, config_space, standardize_y=False, **kwargs):
         types, bounds = get_types(config_space)
         # resource feature
-        types = np.hstack((types, [0])).astype(int)
+        types = np.hstack((types, [0])).astype(np.uint)
         bounds = np.vstack((bounds, [[0.0, 1.0]])).astype(float)
         super().__init__(types=types, bounds=bounds, **kwargs)
 
