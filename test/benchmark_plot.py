@@ -71,69 +71,70 @@ def fetch_color_marker(m_list):
     return color_dict, marker_dict
 
 
-def get_mth_legend(mth, show_mode=False):
-    mth_lower = mth.lower()
-    legend_dict = {
-        'random-n1': 'Random-n1',
-        'smac': 'SMAC',
-        'hyperband-n1': 'Hyperband-n1',
-        'bohb-n1': 'BOHB-n1',
-        'mfes-n1': 'MFES-n1',
+def get_mth_legend(name, show_mode=False):
+    if not show_mode:
+        return mth
+    name = name.lower()
 
-        'hyperband-n8': 'Hyperband-n8',
-        'bohb-n8': 'BOHB-n8',
-        'mfes-n8': 'MFES-n8',
-
-    }
-    if show_mode:
-        if mth.startswith('amfes') and mth.endswith('-n8'):
-            mth = 'AMFES-n8'
-        if mth.startswith('mfes') and mth.endswith('-n8'):
-            mth = 'MFES-n8'
-        legend_dict['ahb-n1'] = 'ASHA-n1'
-        legend_dict['ahb-n8'] = 'ASHA-n8'
-        legend_dict['bohbv0-n1'] = 'BOHB-n1'
-        legend_dict['bohbv0-n8'] = 'BOHB-n8'
-    return legend_dict.get(mth_lower, mth)
+    if name.startswith('asha') and '_stop' in name:
+        label = 'ASHA-Stop'
+    elif name.startswith('asha'):
+        label = 'ASHA'
+    elif name.startswith('ahb') and '_stop' in name:
+        label = 'A-HB-Stop'
+    elif name.startswith('ahb'):
+        label = 'A-HB'
+    elif name.startswith('ams'):
+        label = 'A-MS'
+    elif name.startswith('amfes') and '_stop' in name:
+        label = 'A-MFES-Stop'
+    elif name.startswith('amfes_ms'):
+        label = 'A-MFES-MS'
+    elif name.startswith('amfes'):
+        label = 'A-MFES'
+    elif name.startswith('amfprf_ms'):
+        label = 'A-MFPRF-MS'
+    elif name.startswith('mfes'):
+        label = 'MFES'
+    else:
+        label = name
+    return label
 
 
 def plot_setup(_dataset):
+    y_range = None
     if _dataset == 'covtype':
-        plt.ylim(-0.940, -0.880)
-        plt.xlim(0, runtime_limit+10)
-    elif _dataset == 'codrna':
-        plt.ylim(-0.9793, -0.9753)
-        plt.xlim(0, runtime_limit+10)
-    elif _dataset == 'kuaishou1':
-        plt.ylim(-0.7717, -0.7709)
-        plt.xlim(0, runtime_limit+1000)
-    elif _dataset == 'kuaishou2':
-        plt.ylim(-0.636, -0.611)
-        plt.xlim(0, runtime_limit+1000)
+        y_range = [-0.940, -0.880]
     elif _dataset == 'pokerhand':
-        plt.ylim(-1.001, -0.951)
-        plt.xlim(0, runtime_limit+10)
+        y_range = [-1.001, -0.951]
     elif _dataset.startswith('HIGGS'):
-        plt.ylim(-0.756, -0.746)
-        plt.xlim(0, runtime_limit+10)
+        y_range = [-0.7555, -0.7485]
     elif _dataset.startswith('hepmass'):
-        plt.ylim(-0.8755, -0.8725)
-        plt.xlim(0, runtime_limit+10)
+        y_range = [-0.8755, -0.8725]
     elif _dataset.startswith('censusincome'):
-        plt.ylim(-0.747, -0.737)
-        plt.xlim(0, runtime_limit)
+        y_range = [-0.747, -0.737]
+    elif _dataset == 'codrna':
+        y_range = [-0.9793, -0.9753]
+    elif _dataset == 'kuaishou1':
+        y_range = [-0.7717, -0.7709]
+    elif _dataset == 'kuaishou2':
+        y_range = [-0.636, -0.611]
     elif _dataset == 'cifar10-valid':
-        plt.ylim(-91.65, -90.85)
-        plt.xlim(0, runtime_limit)
+        y_range = [-91.60, -90.80]
     elif _dataset == 'cifar100':
-        plt.ylim(-73.7, -70.7)
-        plt.xlim(0, runtime_limit)
+        y_range = [-73.7, -70.7]
     elif _dataset == 'ImageNet16-120':
-        plt.ylim(-47.0, -45.0)
-        plt.xlim(0, runtime_limit)
+        y_range = [-47.0, -45.0]
     elif _dataset == 'mfeat-fourier(1)':
-        plt.ylim(-0.835, -0.810)
-        plt.xlim(0, runtime_limit)
+        y_range = [-0.835, -0.810]
+    elif _dataset == 'cifar10':
+        y_range = [-0.935, -0.925]
+    elif _dataset == 'penn':
+        y_range = [65, 77]
+
+    if y_range is not None:
+        plt.ylim(*y_range)
+    plt.xlim(0, runtime_limit)
 
 
 print('start', dataset)
