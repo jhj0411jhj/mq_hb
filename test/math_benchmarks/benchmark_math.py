@@ -22,10 +22,9 @@ from test.utils import seeds, timeit
 from test.benchmark_process_record import remove_partial, get_incumbent
 from mq_hb import mth_dict
 
-dataset_choices = ['hartmann']
 parser = argparse.ArgumentParser()
 parser.add_argument('--mths', type=str, default='hyperband')
-parser.add_argument('--dataset', type=str, default='hartmann', choices=dataset_choices)
+parser.add_argument('--dataset', type=str, default='hartmann')
 parser.add_argument('--R', type=int, default=27)
 parser.add_argument('--eta', type=int, default=3)
 parser.add_argument('--n_workers', type=int)        # must set
@@ -34,6 +33,7 @@ parser.add_argument('--time_limit_per_trial', type=int, default=999999)
 parser.add_argument('--rep', type=int, default=1)
 parser.add_argument('--start_id', type=int, default=0)
 
+parser.add_argument('--noise', type=int, default=1)
 parser.add_argument('--noise_alpha', type=float, default=1.0)
 
 args = parser.parse_args()
@@ -49,7 +49,8 @@ time_limit_per_trial = args.time_limit_per_trial
 rep = args.rep
 start_id = args.start_id
 
-noise_alpha = args.noise_alpha
+noise = bool(args.noise)
+noise_alpha = args.noise_alpha if noise else 0
 
 model_name = 'math'
 print(n_workers)
@@ -110,7 +111,9 @@ with timeit('%s all' % datasets):
         # set runtime_limit
         if args.runtime_limit == 0:
             if dataset in ['hartmann']:
-                runtime_limit = 540
+                runtime_limit = 1080
+            elif dataset.startswith('counting'):
+                runtime_limit = 1080
             else:
                 raise ValueError
         else:
@@ -144,7 +147,10 @@ with timeit('%s all' % datasets):
                             method_str = '%s-%d-n%d' % (algo_name, R, n_workers)
                         else:
                             method_str = '%s-n%d' % (algo_name, n_workers)
-                        method_id = method_str + '-%s-%.2f-%d-%s' % (dataset, noise_alpha, seed, timestamp)
+                        if noise:
+                            method_id = method_str + '-%s-%.2f-%d-%s' % (dataset, noise_alpha, seed, timestamp)
+                        else:
+                            method_id = method_str + '-%s-%d-%s' % (dataset, seed, timestamp)
 
                         rng = np.random.RandomState(seed)
                         problem_kwargs = dict()
@@ -156,7 +162,12 @@ with timeit('%s all' % datasets):
                                 obj_func, cs,
                             )
 
-                        dir_path = 'data/benchmark_%s/%s-%.2f-%d/%s/' % (model_name, dataset, noise_alpha, runtime_limit, method_str)
+                        if noise:
+                            dir_path = 'data/benchmark_%s/%s-%.2f-%d/%s/' % (
+                                model_name, dataset, noise_alpha, runtime_limit, method_str)
+                        else:
+                            dir_path = 'data/benchmark_%s/%s-%d/%s/' % (
+                                model_name, dataset, runtime_limit, method_str)
                         file_name = 'record_%s.pkl' % (method_id,)
                         try:
                             if not os.path.exists(dir_path):
@@ -168,7 +179,10 @@ with timeit('%s all' % datasets):
                         print(dir_path, file_name, 'saved!', flush=True)
 
                     try:
-                        dataset_name = '%s-%.2f' % (dataset, noise_alpha)
+                        if noise:
+                            dataset_name = '%s-%.2f' % (dataset, noise_alpha)
+                        else:
+                            dataset_name = '%s' % (dataset, )
                         remove_partial(model_name, dataset_name, [method_str], runtime_limit, R)
                         get_incumbent(model_name, dataset_name, [method_str], runtime_limit)
                     except Exception as e:

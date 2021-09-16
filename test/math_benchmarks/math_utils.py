@@ -9,15 +9,20 @@ def get_math_obj_func_cs(total_resource, eta, problem_str, noise_alpha, rng, pro
     if problem_str == 'hartmann':
         noise_scale = 0.38
     else:
-        noise_scale = 1.0   # todo
-    obj_func = partial(mf_objective_func_math, total_resource=total_resource, eta=eta,
-                       problem=problem, noise_scale=noise_scale, noise_alpha=noise_alpha, rng=rng)
+        noise_scale = 1.0
+    if problem_str.startswith('counting'):
+        obj_func = partial(mf_objective_func_math, total_resource=total_resource, eta=eta,
+                           problem=problem, continue_training=False)
+    else:
+        obj_func = partial(mf_objective_func_math_noise, total_resource=total_resource, eta=eta,
+                           problem=problem, noise_scale=noise_scale, noise_alpha=noise_alpha, rng=rng)
     cs = problem.get_configspace()
     return obj_func, cs
 
 
-def mf_objective_func_math(config, n_resource, extra_conf,
-                           total_resource, eta, problem, noise_scale, noise_alpha, rng: np.random.RandomState):
+def mf_objective_func_math_noise(
+        config, n_resource, extra_conf,
+        total_resource, eta, problem, noise_scale, noise_alpha, rng: np.random.RandomState):
     print('objective extra conf:', extra_conf)
 
     # noise_level = np.log(total_resource / n_resource) / np.log(eta)
@@ -41,9 +46,20 @@ def mf_objective_func_math(config, n_resource, extra_conf,
     return result
 
 
-# problem = get_problem('hartmann')
-# cs = problem.get_configspace()
-# configs = cs.sample_configuration(10000)
-# perfs = [problem.evaluate_config(config) for config in configs]
-# print(np.std(perfs))
+def mf_objective_func_math(config, n_resource, extra_conf, total_resource, eta, problem, continue_training):
+    print('objective extra conf:', extra_conf)
 
+    fidelity = n_resource / total_resource
+    perf = problem.evaluate_config(config, fidelity=fidelity)
+    print('config: %s, resource: %f/%f, perf=%f'
+          % (config, n_resource, total_resource, perf))
+
+    eval_time = 27 * n_resource / total_resource
+    if continue_training and not extra_conf['initial_run']:
+        eval_time -= 27 * n_resource / eta / total_resource
+
+    result = dict(
+        objective_value=perf,  # minimize
+        elapsed_time=eval_time,
+    )
+    return result
