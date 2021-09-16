@@ -255,7 +255,7 @@ class async_mqMFES_stopping(async_mqHyperband_stopping):
 
         # sample config
         excluded_configs = self.bracket[next_rung_id]['configs']
-        if len(self.target_y[self.iterate_r[-1]]) == 0 or self.test_random:
+        if any([len(y_list) == 0 for y_list in self.target_y.values()]) or self.test_random:
             next_config = sample_configuration(self.config_space, excluded_configs=excluded_configs)
         else:
             # Like BOHB, sample a fixed percentage of random configurations.

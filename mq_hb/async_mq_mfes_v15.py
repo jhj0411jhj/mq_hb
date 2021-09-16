@@ -191,7 +191,7 @@ class async_mqMFES_v15(async_mqHyperband_v2):
 
         # sample config
         excluded_configs = self.brackets[bracket_id][0]['configs']
-        if len(self.target_y[self.iterate_r[-1]]) == 0:
+        if any([len(y_list) == 0 for y_list in self.target_y.values()]):
             next_config = sample_configuration(self.config_space, excluded_configs=excluded_configs)
         else:
             # Like BOHB, sample a fixed percentage of random configurations.
