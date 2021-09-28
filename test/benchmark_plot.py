@@ -23,6 +23,7 @@ parser.add_argument('--dataset', type=str)
 parser.add_argument('--mths', type=str, default=default_mths)
 parser.add_argument('--R', type=int, default=27)
 parser.add_argument('--runtime_limit', type=int)    # if you don't want to use default setup
+parser.add_argument('--base_time', type=int)    # plot method with different n_workers and runtime_limit
 parser.add_argument('--model', type=str, default='xgb')
 parser.add_argument('--default_value', type=float, default=0.0)
 
@@ -31,6 +32,7 @@ dataset = args.dataset
 mths = args.mths.split(',')
 R = args.R
 model = args.model
+base_time = args.base_time
 default_value = args.default_value
 
 
@@ -134,7 +136,7 @@ def plot_setup(_dataset):
 
     if y_range is not None:
         plt.ylim(*y_range)
-    plt.xlim(0, runtime_limit)
+    plt.xlim(0, base_time or runtime_limit)
 
 
 print('start', dataset)
@@ -155,6 +157,10 @@ plot_list = []
 legend_list = []
 result = dict()
 for mth in mths:
+    if base_time is not None:
+        n_workers = int(mth.split('-')[-1][1:])     # 'ALGO-nX'
+        runtime_limit = int(base_time / n_workers)
+        print('Plotting %s: n_workers=%d, base_time=%d, runtime_limit=%d.' % (mth, n_workers, base_time, runtime_limit))
     stats = []
     dir_path = 'data/benchmark_%s/%s-%d/%s/' % (model, dataset, runtime_limit, mth)
     for file in os.listdir(dir_path):
@@ -233,6 +239,11 @@ for mth in mths:
 # plt.axhline(-0.849296, linestyle="--", color="b", lw=1, label="Default")
 # plt.ylim(-0.863, -0.844)
 # plt.xlim(0, runtime_limit+1000)
+
+# plt.xscale('log')
+# plt.yscale('log')
+# plt.ylim(1, 64)
+# plt.xlim(10, base_time*1.1)
 
 # show plot
 plt.legend(loc='upper right')

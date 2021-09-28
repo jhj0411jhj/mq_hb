@@ -179,7 +179,7 @@ def create_point(x, stats, default=0.0):
     return perf_list
 
 
-def create_plot_points(stats, start_time, end_time, point_num=500, default=0.0):
+def create_plot_points(stats, start_time, end_time, point_num=500, default=0.0, log=False):
     """
 
     :param stats:
@@ -189,9 +189,14 @@ def create_plot_points(stats, start_time, end_time, point_num=500, default=0.0):
     :param point_num:
     :param default:
         init value of perf
+    :param log:
+        using logspace or linspace
     :return:
     """
-    x = np.linspace(start_time, end_time, num=point_num)
+    if log:
+        x = np.logspace(np.log10(start_time), np.log10(end_time), num=point_num, base=10.0)
+    else:
+        x = np.linspace(start_time, end_time, num=point_num)
     _mean, _std = list(), list()
     for i, stage in enumerate(x):
         perf_list = create_point(stage, stats, default)

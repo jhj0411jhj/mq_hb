@@ -28,6 +28,7 @@ parser.add_argument('--dataset', type=str, default='hartmann')
 parser.add_argument('--R', type=int, default=27)
 parser.add_argument('--eta', type=int, default=3)
 parser.add_argument('--n_workers', type=int)        # must set
+parser.add_argument('--base_time', type=int, default=0)
 parser.add_argument('--runtime_limit', type=int, default=0)
 parser.add_argument('--time_limit_per_trial', type=int, default=999999)
 parser.add_argument('--rep', type=int, default=1)
@@ -45,6 +46,12 @@ datasets = args.dataset.split(',')
 R = args.R
 eta = args.eta
 n_workers = args.n_workers  # Caution: must set for saving result to different dirs
+base_time = args.base_time
+if base_time != 0:
+    runtime_limit = int(base_time / n_workers)
+    print('base_time: %d, runtime_limit: %d' % (base_time, runtime_limit))
+else:
+    runtime_limit = args.runtime_limit
 time_limit_per_trial = args.time_limit_per_trial
 rep = args.rep
 start_id = args.start_id
@@ -108,17 +115,6 @@ def evaluate_simulation(algo_class, algo_kwargs, method_id, n_workers, seed, par
 
 with timeit('%s all' % datasets):
     for dataset in datasets:
-        # set runtime_limit
-        if args.runtime_limit == 0:
-            if dataset in ['hartmann']:
-                runtime_limit = 1080
-            elif dataset.startswith('counting'):
-                runtime_limit = 1080
-            else:
-                raise ValueError
-        else:
-            runtime_limit = args.runtime_limit
-
         with timeit('%s all' % dataset):
             for algo_name in mths:
                 with timeit('%s %d %d' % (algo_name, start_id, rep)):
