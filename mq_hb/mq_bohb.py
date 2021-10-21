@@ -79,8 +79,10 @@ class mqBOHB(mqHyperband):
         # update config advisor
         for config, perf in zip(T, val_losses):
             objs = [perf]
-            # config, trial_state, constraints, objs, elapsed_time
-            observation = Observation(config, SUCCESS, None, objs, None)
+            observation = Observation(
+                config=config, objs=objs, constraints=None,
+                trial_state=SUCCESS, elapsed_time=None,
+            )
             self.config_advisor.update_observation(observation)
             self.logger.info('update observation: config=%s, perf=%f' % (str(config), perf))
         self.logger.info('%d observations updated. %d incumbent configs total.' % (len(T), len(self.incumbent_configs)))

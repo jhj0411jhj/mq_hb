@@ -105,7 +105,10 @@ class async_mqBOHB_v2(async_mqHyperband):
             self.incumbent_configs.append(config)
             self.incumbent_perfs.append(perf)
             # train BO surrogate
-            observation = Observation(config, SUCCESS, None, [perf], None)
+            observation = Observation(
+                config=config, objs=[perf], constraints=None,
+                trial_state=SUCCESS, elapsed_time=None,
+            )
             self.history_container.update_observation(observation)
             self.fit_kde_models(self.history_container)
 
