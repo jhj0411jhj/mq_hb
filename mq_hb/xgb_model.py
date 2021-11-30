@@ -21,7 +21,7 @@ class XGBoost:
         self.random_state = np.random.RandomState(seed)
         self.estimator = None
 
-    def fit(self, X, y):
+    def fit(self, X, y, eval_set=None):
         from xgboost import XGBClassifier
         # objective is set automatically in sklearn interface of xgboost
         self.estimator = XGBClassifier(
@@ -38,7 +38,7 @@ class XGBoost:
             random_state=self.random_state,
             n_jobs=self.n_jobs,
         )
-        self.estimator.fit(X, y)
+        self.estimator.fit(X, y, eval_set=eval_set)
         return self
 
     def predict(self, X):
@@ -61,4 +61,7 @@ class XGBoost:
         cs.add_hyperparameters([n_estimators, max_depth, learning_rate, min_child_weight, subsample,
                                 colsample_bytree, gamma, reg_alpha, reg_lambda])
         return cs
+
+    def evals_result(self):
+        return self.estimator.evals_result()
 

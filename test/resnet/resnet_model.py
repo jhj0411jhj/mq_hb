@@ -202,6 +202,9 @@ class BaseImgClassificationNeuralNetwork(BaseNeuralNetwork):
             epoch_avg_acc /= num_train_samples
 
             print('Epoch %d: Train loss %.4f, train acc %.4f' % (epoch, epoch_avg_loss, epoch_avg_acc))
+            if not hasattr(self, 'train_perf_list'):  # for plotting curve
+                self.train_perf_list = list()
+            self.train_perf_list.append([epoch, float(epoch_avg_loss), float(epoch_avg_acc)])
 
             if val_loader is not None:
                 self.model.eval()
