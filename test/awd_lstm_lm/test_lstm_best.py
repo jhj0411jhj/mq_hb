@@ -1,58 +1,27 @@
 """
 example cmdline:
 
-python test/awd_lstm_lm/benchmark_lstm_runtest.py --mth hyperband-n4 --rep 1 --start_id 0
+python test/awd_lstm_lm/test_lstm_best.py --mth amfesv20-n4 --rep 5 --start_id 0
 
 """
+
 import os
-import sys
 import time
 import argparse
 import numpy as np
 import pickle as pkl
 
-sys.path.insert(0, ".")
-sys.path.insert(1, "../open-box")    # for dependency
+import sys
+sys.path.insert(0, '.')
+sys.path.insert(1, '../open-box')    # for dependency
+from test.utils import timeit
 from test.utils import seeds
-
-import torch
-import math
-from math import ceil
-
-from splitcross import SplitCrossEntropyLoss
-from model import RNNModel
-from lstm_obj import get_corpus, evaluate, train
-
-try:
-    from utils import batchify, get_batch, repackage_hidden
-except Exception:
-    import sys
-    sys.path.insert(0, '.')
-    from test.awd_lstm_lm.utils import batchify, get_batch, repackage_hidden
-
-# Set the random seed manually for reproducibility.
-seed = 1
-np.random.seed(seed)
-torch.manual_seed(seed)
-torch.cuda.manual_seed(seed)
-
-log_interval = 200
-tied = True
-bptt = 70
-max_epoch = 200
-n_layers = 3
-clip = 0.25
-alpha = 2
-beta = 1
-decay_epoch = [100, 150]
-
-eval_batch_size = 10
-test_batch_size = 1
+from lstm_obj import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', type=str, default='penn')
-parser.add_argument('--mth', type=str, default='hyperband-n4')
-parser.add_argument('--rep', type=int, default=1)
+parser.add_argument('--mth', type=str, default='amfesv20-n4')
+parser.add_argument('--rep', type=int, default=5)
 parser.add_argument('--start_id', type=int, default=0)
 parser.add_argument('--runtime_limit', type=int, default=172800)
 
@@ -62,20 +31,11 @@ mth = args.mth
 rep = args.rep
 start_id = args.start_id
 runtime_limit = args.runtime_limit
-model = 'lstm'
-
-assert dataset == 'penn'
-data_path = './test/awd_lstm_lm/data/penn'
-corpus = get_corpus(data_path)
-
-try:
-    from sklearn.metrics.scorer import accuracy_scorer
-except ModuleNotFoundError:
-    from sklearn.metrics._scorer import accuracy_scorer
-    print('from sklearn.metrics._scorer import accuracy_scorer')
 
 
-def test_func(config, device='cuda'):    # device='cuda' 'cuda:0'
+def lstm_objective_func_gpu(config, corpus, device='cuda'):  # device='cuda' 'cuda:0'
+    t0 = time.time()
+    assert corpus is not None
 
     device = torch.device(device)
 
@@ -92,16 +52,17 @@ def test_func(config, device='cuda'):    # device='cuda' 'cuda:0'
     lr = config['lr']
     print('worker receive config:', config)
 
+    epoch_ratio = 1
+
     ntokens = len(corpus.dictionary)
     model = RNNModel('LSTM', ntokens, emsize, hidden_size, n_layers, dropout, dropouth,
                      dropouti, dropoute, wdrop, tied)
 
     train_data = batchify(corpus.train, batch_size, device)
-    # val_data = batchify(corpus.valid, eval_batch_size, device)
-    val_data = batchify(corpus.test, eval_batch_size, device)   # test
+    val_data = batchify(corpus.valid, eval_batch_size, device)
 
     init_epoch_num = 1
-    epoch_num = max_epoch
+    epoch_num = ceil(max_epoch * epoch_ratio)
     print('epoch_num', epoch_num)
     ###
     if not criterion:
@@ -127,6 +88,7 @@ def test_func(config, device='cuda'):    # device='cuda' 'cuda:0'
     # Loop over epochs.
     best_val_loss = []
     stored_loss = 100000000
+    evals_result = []
 
     # Ensure the optimizer is optimizing params, which includes both the model's weights as well as the criterion's weight (i.e. Adaptive Softmax)
     optimizer = torch.optim.SGD(params, lr=lr, weight_decay=weight_decay)
@@ -169,32 +131,52 @@ def test_func(config, device='cuda'):    # device='cuda' 'cuda:0'
             best_val_loss.append(val_loss)
             return_pp = math.exp(val_loss)
 
-    # Turn it into a minimization problem.
-    return return_pp
+        evals_result.append(return_pp)
+
+    perf = return_pp
+    test_perf = None
+    train_time = time.time() - t0
+
+    return perf, test_perf, evals_result, train_time
 
 
-print('===== start test %s %s: rep=%d' % (mth, dataset, rep))
+data_path = './test/awd_lstm_lm/data/penn'
+corpus = get_corpus(data_path)
+
+
+print('===== start test %s %s: rep=%d' % (mth, dataset, rep, ))
 for i in range(start_id, start_id + rep):
     seed = seeds[i]
 
-    dir_path = 'data/benchmark_%s/%s-%d/%s/' % (model, dataset, runtime_limit, mth)
+    dir_path = 'data/benchmark_lstm/%s-%d/%s/' % (dataset, runtime_limit, mth)
     for file in os.listdir(dir_path):
         if file.startswith('incumbent_new_record_%s-%s-%d-' % (mth, dataset, seed)) \
                 and file.endswith('.pkl'):
             # load config
             with open(os.path.join(dir_path, file), 'rb') as f:
                 record = pkl.load(f)
-            print(model, dataset, mth, seed, 'loaded!', record, flush=True)
+            print(dataset, mth, seed, 'loaded!', record, flush=True)
 
             # run test
             config = record['configuration']
-            perf = test_func(config, device='cuda')
-            print(model, dataset, mth, seed, 'perf =', perf)
+            print('=== lstm best param ===')
+            perf, test_perf, evals_result, train_time = lstm_objective_func_gpu(config, corpus)
+            print(evals_result)
+            print('=== perf(val, test):', perf, test_perf)
+            print('=== train time(s):', train_time)
+            # print(list(evals_result['validation_0'].values())[0])
 
-            # save perf
+            save_item = (config, perf, test_perf, evals_result, train_time)
+
             timestamp = time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime(time.time()))
             method_id = mth + '-%s-%d-%s' % (dataset, seed, timestamp)
-            perf_file_name = 'incumbent_test_perf_%s.pkl' % (method_id,)
-            with open(os.path.join(dir_path, perf_file_name), 'wb') as f:
-                pkl.dump(perf, f)
-            print(dir_path, perf_file_name, 'saved!', flush=True)
+            save_dir_path = 'data/default_test/lstm-%s/' % (dataset, )
+            save_file_name = 'lstm_best-%s.pkl' % (method_id,)
+            try:
+                if not os.path.exists(save_dir_path):
+                    os.makedirs(save_dir_path)
+            except FileExistsError:
+                pass
+            with open(os.path.join(save_dir_path, save_file_name), 'wb') as f:
+                pkl.dump(save_item, f)
+            print('save to:', save_dir_path, save_file_name)

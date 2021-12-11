@@ -1,7 +1,7 @@
 """
 example cmdline:
 
-python test/default_test/resnet_best.py --mth amfesv19-n4 --rep 5 --start_id 0
+python test/resnet/test_resnet_best.py --mth amfesv19-n4 --rep 5 --start_id 0
 
 """
 
@@ -27,7 +27,7 @@ except ModuleNotFoundError:
 from resnet_model import get_estimator
 from resnet_util import get_path_by_config, get_transforms
 from resnet_dataset import ImageDataset
-from resnet_obj import dl_holdout_validation
+from resnet_obj import dl_holdout_validation, get_score
 from test.utils import seeds
 
 from openbox.utils.constants import MAXINT
@@ -58,6 +58,9 @@ def resnet_objective_func_gpu(config, device='cuda'):    # device='cuda' 'cuda:0
 
     data_transforms = get_transforms(image_size=image_size)
     image_data.load_data(data_transforms['train'], data_transforms['val'])
+    # load test
+    image_data.set_test_path(data_dir)
+    image_data.load_test_data(data_transforms['val'])
     start_time = time.time()
 
     config_dict = config.get_dictionary().copy()
@@ -70,10 +73,12 @@ def resnet_objective_func_gpu(config, device='cuda'):    # device='cuda' 'cuda:0
 
     try:
         score = dl_holdout_validation(estimator, scorer, image_data, random_state=1)
+        test_score = get_score(estimator, scorer, image_data, random_state=1, run_test=True)
     except Exception as e:
         import traceback
         traceback.print_exc()
         score = -MAXINT
+        test_score = -MAXINT
     train_time = time.time() - start_time
     print('Evaluation | Score: %.4f | Time cost: %.2f seconds' %
           (scorer._sign * score,
@@ -81,7 +86,7 @@ def resnet_objective_func_gpu(config, device='cuda'):    # device='cuda' 'cuda:0
     print(str(config))
 
     perf = -score
-    test_perf = None
+    test_perf = -test_score
     evals_result = [estimator.train_perf_list, estimator.val_perf_list]
     return perf, test_perf, evals_result, train_time
 
@@ -111,8 +116,9 @@ for i in range(start_id, start_id + rep):
             save_item = (config, perf, test_perf, evals_result, train_time)
 
             timestamp = time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime(time.time()))
+            method_id = mth + '-%s-%d-%s' % (dataset, seed, timestamp)
             save_dir_path = 'data/default_test/resnet-%s/' % (dataset, )
-            save_file_name = 'resnet_best-%s-%04d-%s.pkl' % (dataset, seed, timestamp)
+            save_file_name = 'resnet_best-%s.pkl' % (method_id,)
             try:
                 if not os.path.exists(save_dir_path):
                     os.makedirs(save_dir_path)

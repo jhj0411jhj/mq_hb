@@ -14,6 +14,7 @@ from mq_hb.async_mq_sh import async_mqSuccessiveHalving
 from mq_hb.async_mq_sh_v0 import async_mqSuccessiveHalving_v0
 from mq_hb.async_mq_sh_v2 import async_mqSuccessiveHalving_v2
 from mq_hb.async_mq_sh_v3 import async_mqSuccessiveHalving_v3
+from mq_hb.async_mq_sh_v4 import async_mqSuccessiveHalving_v4
 from mq_hb.async_mq_hb import async_mqHyperband
 from mq_hb.async_mq_hb_v0 import async_mqHyperband_v0
 from mq_hb.async_mq_hb_v2 import async_mqHyperband_v2
@@ -71,6 +72,7 @@ mth_dict = dict(
     asha=(async_mqSuccessiveHalving, 'async'),       # delayed asha
     ashav0=(async_mqSuccessiveHalving_v0, 'async'),  # origin asha
     ashav2=(async_mqSuccessiveHalving_v2, 'async'),  # promotion cycle
+    ashav4=(async_mqSuccessiveHalving_v4, 'async'),  # sh + asha (another delay strategy)
     ahb=(async_mqHyperband, 'async'),       # hb + delayed asha
     ahbv0=(async_mqHyperband_v0, 'async'),  # hb + origin asha
     ahbv2=(async_mqHyperband_v2, 'async'),  # hb + promotion cycle

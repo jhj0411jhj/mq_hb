@@ -180,6 +180,13 @@ def dl_holdout_validation(estimator, scorer, dataset, random_state=1, run_test=F
             return scorer._sign * estimator.score(dataset, scorer._score_func, run_test=run_test)
 
 
+def get_score(estimator, scorer, dataset, random_state=1, run_test=False):
+    with warnings.catch_warnings():
+        # ignore all caught warnings
+        warnings.filterwarnings("ignore")
+        return scorer._sign * estimator.score(dataset, scorer._score_func, run_test=run_test)
+
+
 if __name__ == '__main__':
     extra_conf = dict(initial_run=True)
     mf_objective_func_gpu(config=test_config, n_resource=27, extra_conf=extra_conf, device='cuda', total_resource=81)

@@ -31,7 +31,7 @@ def evaluate_parallel(algo_class, algo_kwargs, method_id, n_workers, dataset, se
     stopping_variant = algo_class in stopping_mths
     print('stopping_variant =', stopping_variant)
 
-    data_path = './test/awd-lstm-lm/data/penn'
+    data_path = './test/awd_lstm_lm/data/penn'
     corpus = get_corpus(data_path)
 
     model_dir = os.path.join('./data/lstm_save_models', method_id)

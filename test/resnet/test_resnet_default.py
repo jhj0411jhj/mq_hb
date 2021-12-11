@@ -1,7 +1,7 @@
 """
 example cmdline:
 
-python test/resnet/test_resnet_manual.py
+python test/resnet/test_resnet_default.py
 
 """
 
@@ -85,10 +85,24 @@ def resnet_objective_func_gpu(config, device='cuda'):    # device='cuda' 'cuda:0
 
 
 cs = ResNetClassifier.get_hyperparameter_search_space()
-config = cs.get_default_configuration()   # todo
+
+conf_dict = dict(   # see Deep Residual Learning for Image Recognition (CVPR 2016) Kaiming He. setting for cifar10
+    optimizer='SGD',
+    sgd_learning_rate=0.1,
+    sgd_momentum=0.9,
+    nesterov='False',
+    batch_size=128,
+    lr_decay=1e-1,
+    weight_decay=1e-4,
+    epoch_num=200,
+)
+
+from openbox.utils.config_space.space_utils import get_config_from_dict
+config = get_config_from_dict(conf_dict, cs)
+print(config)
 
 with timeit('%s' % (dataset, )):
-    print('=== resnet manual param (my default)===')
+    print('=== resnet default param (CVPR2016 Kaiming He)===')
     perf, test_perf, evals_result, train_time = resnet_objective_func_gpu(config)
     print(evals_result)
     print('=== perf(val, test):', perf, test_perf)
@@ -99,7 +113,7 @@ with timeit('%s' % (dataset, )):
 
     timestamp = time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime(time.time()))
     dir_path = 'data/default_test/resnet-%s/' % (dataset, )
-    file_name = 'resnet_manual-%s-%04d-%s.pkl' % (dataset, seed, timestamp)
+    file_name = 'resnet_default-%s-%04d-%s.pkl' % (dataset, seed, timestamp)
     try:
         if not os.path.exists(dir_path):
             os.makedirs(dir_path)
